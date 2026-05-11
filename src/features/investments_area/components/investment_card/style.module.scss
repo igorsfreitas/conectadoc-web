@@ -1,0 +1,36 @@
+$neutral-0: rgb(var(--neutral-0-color, (255, 255, 255)));
+
+.card {
+  display: flex;
+  min-width: 23rem;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 0 0;
+
+  border-radius: 0.5rem;
+  background: $neutral-0;
+
+  .cardTitle {
+    display: flex;
+    padding: 1rem;
+    align-items: center;
+    gap: 1rem;
+    align-self: stretch;
+  }
+
+  .options {
+    display: flex;
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+
+    div {
+      padding: 0 !important;
+    }
+
+    div:hover {
+      cursor: pointer;
+    }
+  }
+}

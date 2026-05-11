@@ -1,0 +1,188 @@
+image: cypress/browsers:node-20.14.0-chrome-125.0.6422.141-1-ff-126.0.1-edge-125.0.2535.85-1
+
+definitions:
+  steps:
+    - step: &sonar
+        name: Run Sonar
+        caches:
+          - node
+        script:
+          - npm i -g sonarqube-scanner
+          - sonar-scanner -D project.settings=./sonar-project.properties -X
+
+    - step: &unitTests
+        name: Run unit tests
+        caches:
+          - node
+        script:
+          - npm install
+          - npm run test:ci
+
+    - step: &e2eTests
+        name: Run E2E tests
+        oidc: true
+        script:
+          - |
+            if [[ "${BITBUCKET_PR_DESTINATION_BRANCH}" =~ ^main$ ]]; then
+              npm install
+              npm run dev &
+              sleep 10
+              npm run test:e2e
+            fi
+          - |
+            if [[ "${BITBUCKET_PR_DESTINATION_BRANCH}" =~ ^release/.+ ]]; then
+              npm install
+              npm run dev &
+              sleep 10
+              npm run test:e2e
+            fi
+        artifacts:
+          - cypress/screenshots/**
+          - cypress/videos/**
+
+    - step: &lint
+        name: Check linting
+        caches:
+          - node
+        script:
+          - npm install
+          - npm run lint
+
+    - step: &prettier
+        name: Check Prettier
+        caches:
+          - node
+        script:
+          - npm install
+          - npm run prettier
+
+    - step: &build
+        name: Build with Vite
+        caches:
+          - node
+        script:
+          - npm install
+          - npm run build
+
+    - step: &deployAll
+        name: Deploy Infrastructure + App + Invalidate Cache
+        oidc: true
+        script:
+          # === INSTALAÇÃO DE DEPENDÊNCIAS ===
+          - apt-get update && apt-get install -y gettext jq unzip curl
+          
+          # Instalar AWS CLI v2
+          - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          - unzip -o awscliv2.zip
+          - ./aws/install
+          - export PATH=$PATH:/usr/local/bin
+          - aws --version
+
+          # === AUTENTICAÇÃO OIDC ===
+          - |
+            echo "🔐 Assumindo role com OIDC..."
+            CREDENTIALS_JSON=$(aws sts assume-role-with-web-identity \
+              --role-arn "$AWS_OIDC_ROLE_ARN" \
+              --role-session-name "bitbucket-oidc-session" \
+              --web-identity-token "$BITBUCKET_STEP_OIDC_TOKEN" \
+              --duration-seconds 3600)
+
+            export AWS_ACCESS_KEY_ID=$(echo "$CREDENTIALS_JSON" | jq -r '.Credentials.AccessKeyId')
+            export AWS_SECRET_ACCESS_KEY=$(echo "$CREDENTIALS_JSON" | jq -r '.Credentials.SecretAccessKey')
+            export AWS_SESSION_TOKEN=$(echo "$CREDENTIALS_JSON" | jq -r '.Credentials.SessionToken')
+            echo "✅ Autenticação OIDC concluída"
+
+          # === BUILD ===
+          - mkdir -p ~/.ssh
+          - ssh-keyscan -t rsa bitbucket.org >> ~/.ssh/known_hosts
+          - npm run i:afinz
+          - echo VITE_APP_BASE_URL="$base_url" > .env
+          - echo VITE_APP_SIGN_IN_BASE_URL="$sign_in_base_url" >> .env
+          - npm run build
+
+          # === DEPLOY DA INFRAESTRUTURA ===
+          - echo "🏗️  Iniciando deploy da infraestrutura..."
+          - export STACK_NAME="$STACK_NAME"
+          - export AWS_DEFAULT_REGION="$AWS_DEFAULT_REGION"
+          - export BUCKET_NAME="$BUCKET_NAME"
+          
+          # Substituição no arquivo CloudFormation
+          - envsubst < devops/cloud-formation.yaml > cloud-formation-rendered.yaml
+          - cat cloud-formation-rendered.yaml
+          
+          # Deploy CloudFormation
+          - aws cloudformation deploy --template-file cloud-formation-rendered.yaml --stack-name "$STACK_NAME" --capabilities CAPABILITY_NAMED_IAM
+          - echo "✅ Infraestrutura deployada com sucesso"
+
+          # === DEPLOY DA APLICAÇÃO NO S3 ===
+          - echo "📦 Iniciando deploy da aplicação no S3..."
+          - aws s3 sync dist/ s3://$BUCKET_NAME/ --delete
+          - echo "✅ Aplicação deployada no S3"
+
+          # === INVALIDAÇÃO DO CLOUDFRONT ===
+          - |
+            echo "🔍 Buscando ID do CloudFront..."
+            export AWS_CLOUDFRONT_ID=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK_NAME" \
+              --query 'Stacks[0].Outputs[?OutputKey==`CloudFrontId`].OutputValue' \
+              --output text)
+
+            if [ -z "$AWS_CLOUDFRONT_ID" ]; then
+              echo "❌ Nenhum CloudFrontId encontrado no stack $STACK_NAME"
+              exit 1
+            fi
+
+            echo "✅ CloudFront ID detectado: $AWS_CLOUDFRONT_ID"
+
+          - |
+            echo "🚀 Iniciando invalidação do CloudFront..."
+            aws cloudfront create-invalidation \
+              --distribution-id "$AWS_CLOUDFRONT_ID" \
+              --paths "/*"
+
+            echo "✅ Invalidação enviada com sucesso!"
+            echo "🎉 Deploy completo finalizado!"
+
+        artifacts:
+          - cloud-formation-rendered.yaml
+
+pipelines:
+  pull-requests:
+    '**':
+      - parallel:
+          - step: *unitTests
+          - step: *lint
+          - step: *prettier
+          - step: *build
+          - step: *e2eTests
+
+  branches:
+    feature/*:
+      - parallel:
+          - step: *prettier
+          - step: *unitTests
+          - step: *build
+    
+    develop:
+      - step:
+          <<: *deployAll
+          name: Deploy Complete to Develop
+          deployment: Develop
+
+    release/*-rc:
+      - step:
+          <<: *deployAll
+          name: Deploy Complete to Staging
+          deployment: Staging
+
+    release/*:
+      - step:
+          <<: *deployAll
+          name: Deploy Complete to UAT
+          deployment: UAT
+
+    main:
+      - step:
+          <<: *deployAll
+          name: Deploy Complete to Production
+          deployment: Production

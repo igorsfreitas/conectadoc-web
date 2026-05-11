@@ -1,0 +1,154 @@
+.investmentCard {
+  width: 100%;
+  max-width: 100%;
+  background-color: rgb(var(--neutral-0-color, (255, 255, 255)));
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.header {
+  padding: 1rem;
+  background-color: rgb(var(--neutral-0-color, (255, 255, 255)));
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: rgb(var(--neutral-5-color, (250, 252, 252)));
+  }
+}
+
+.titleContainer {
+  display: flex;
+  align-items: center;
+}
+
+.expandIcon {
+  color: rgb(var(--neutral-60-color, (86, 89, 89)));
+  font-size: 0.75rem;
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+
+  &.expanded {
+    transform: rotate(0);
+  }
+
+  &:not(.expanded) {
+    transform: rotate(-90deg);
+  }
+}
+
+.title {
+  margin: 0;
+  color: rgb(var(--neutral-100-color, (24, 25, 26)));
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.summaryContainer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 1rem;
+  gap: 1.5rem;
+  border-bottom: 1px solid rgb(var(--neutral-5-color, (250, 252, 252)));
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.summaryLabel {
+  font-size: 0.875rem;
+  color: rgb(var(--neutral-60-color, (86, 89, 89)));
+  margin-bottom: 0.25rem;
+}
+
+.summaryValue {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: rgb(var(--neutral-100-color, (24, 25, 26)));
+
+  &.positive {
+    color: rgb(var(--success-50-color, (64, 181, 111)));
+  }
+}
+
+.tableContainer {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.transactionsTable {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+
+    &:not(:first-child) {
+      text-align: right;
+    }
+  }
+
+  th {
+    background-color: rgb(var(--neutral-10-color, (245, 247, 247)));
+    color: rgb(var(--neutral-60-color, (86, 89, 89)));
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+  }
+
+  tbody {
+    tr {
+      &:nth-child(even) {
+        background-color: rgb(var(--neutral-10-color, (245, 247, 247)));
+      }
+
+      &:hover {
+        background-color: rgb(var(--neutral-5-color, (250, 252, 252)));
+      }
+    }
+  }
+
+  .totalRow {
+    background-color: rgb(var(--neutral-10-color, (245, 247, 247))) !important;
+    font-weight: 500;
+  }
+
+  .yieldColumn {
+    color: rgb(var(--success-50-color, (64, 181, 111)));
+
+    &.negative {
+      color: rgb(var(--error-50-color, (231, 71, 66)));
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.summaryContainer,
+.tableContainer {
+  animation: fadeIn 0.3s ease;
+}

@@ -1,0 +1,68 @@
+.body {
+  display: flex;
+  height: 50rem;
+  min-width: 27.375rem;
+  padding: 0rem 2rem;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 0 0;
+}
+
+.bodyContent {
+  display: flex;
+  max-width: 27.375rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.bodyContainer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.textBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.textBoxRight {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: right;
+
+  > div {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  span {
+    cursor: pointer;
+  }
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}

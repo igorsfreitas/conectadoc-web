@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/afinz.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="application/javascript" src="starter.js"></script>
+    <title>Afinz - Portal de Investimento</title>
+  </head>
+  <body class="light-theme">
+    <div id="root"></div>
+    <script type="application/javascript">
+      const uuid = uuidV4();
+      sessionStorage.setItem('uuidSession', uuid);
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

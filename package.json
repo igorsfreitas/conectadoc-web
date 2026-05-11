@@ -1,0 +1,56 @@
+{
+  "name": "portal_investidor",
+  "private": true,
+  "version": "1.0.0-rc",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc -b && vite build",
+    "i:afinz": "npm run install:afinz",
+    "install:afinz": "node ./scripts/installAfinz.js",
+    "lint": "eslint .",
+    "prettier": "npx prettier . --check",
+    "prettier:fix": "npx prettier . --write",
+    "preview": "vite preview",
+    "test:unit": "jest",
+    "test:ci": "npx jest . --coverage",
+    "test:e2e": "cypress run"
+  },
+  "dependencies": {
+    "@afinz/design-system": "bitbucket:afinz-in20/design_system_web#0.1.0",
+    "@afinz/logger": "bitbucket:afinz-in20/afinz-logger#feature/BAM-8876",
+    "@afinz/rest-client": "bitbucket:afinz-in20/afinz-rest-client#develop",
+    "@afinz/utils": "bitbucket:afinz-in20/afinz_web_utils#develop",
+    "qrcode.react": "^4.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.11.0",
+    "@jest/globals": "^29.7.0",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "cypress": "^15.6.0",
+    "globals": "^15.9.0",
+    "jest": "^29.7.0",
+    "prettier": "3.3.3",
+    "sass": "^1.78.0",
+    "sass-embedded": "^1.78.0",
+    "ts-jest": "^29.2.5",
+    "ts-jest-mock-import-meta": "^1.2.0",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.6.0",
+    "vite": "^5.4.1"
+  },
+  "keywords": [],
+  "license": "ISC",
+  "description": "",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,125 @@
+.help {
+  display: flex;
+  width: 34.5rem;
+  padding: 1.5rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+
+  .container {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    align-self: stretch;
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1.5rem;
+      flex: 1 0 0;
+
+      .header {
+        display: flex;
+        width: 31.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+
+        .title {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          align-self: stretch;
+
+          .textContent {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+            align-self: stretch;
+          }
+
+          & > h6 {
+            flex: 1 0 0;
+          }
+
+          & > div > svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: rgb(var(--neutral-60-color, (86, 89, 89)));
+          }
+
+          & > div > svg:hover {
+            cursor: pointer;
+          }
+        }
+
+        .label {
+          align-self: stretch;
+          color: rgb(var(--neutral-40-color, (122, 128, 128)));
+          text-align: left;
+        }
+
+        .taxs {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1rem;
+          align-self: stretch;
+
+          .titleLT {
+            align-self: stretch;
+            color: rgb(var(--neutral-100-color, (24, 25, 26)));
+            text-align: left;
+          }
+
+          .label {
+            align-self: stretch;
+            color: rgb(var(--neutral-40-color, (122, 128, 128)));
+            text-align: left;
+          }
+        }
+
+        .button {
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          text-decoration: underline;
+          font-weight: bold;
+          font-size: 0.875rem;
+        }
+      }
+
+      .contacts {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        align-self: stretch;
+
+        .body {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1rem;
+          align-self: stretch;
+
+          .textContent {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+            align-self: stretch;
+          }
+
+          p {
+            text-align: left;
+            align-self: stretch;
+            color: rgb(var(--neutral-60-color, (86, 89, 89)));
+          }
+        }
+      }
+    }
+  }
+}

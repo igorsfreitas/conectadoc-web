@@ -1,0 +1,16 @@
+.authLayout {
+  background-color: rgb(var(--primary-50-color, (0, 198, 204)));
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mainContent {
+  background-color: rgb(var(--neutral-5-color, (250, 252, 252)));
+  padding: var(--spacing-extra-big, 3rem) var(--spacing-big, 2rem);
+  border-radius: var(--rouding-large, 1rem);
+
+  width: 100%;
+  max-width: 31.25rem;
+}

@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy de site estático no S3 com CloudFront e domínio customizado
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Nome do bucket S3
+    Default: ${BUCKET_NAME}
+
+  AcmCertificateArn:
+    Type: String
+    Description: ARN do certificado ACM (deve estar em us-east-1)
+    Default: ${CERTIFICATE_ARN}
+
+Resources:
+  # -------------------------
+  # Bucket S3 (site estático privado)
+  # -------------------------
+  WebAppBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # -------------------------
+  # Origin Access Control (CloudFront → S3)
+  # -------------------------
+  WebAppOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${BucketName}-oac"
+        Description: "Permite CloudFront acessar o bucket S3 de forma segura"
+        SigningProtocol: sigv4
+        SigningBehavior: always
+        OriginAccessControlOriginType: s3
+
+  # -------------------------
+  # Bucket Policy (permite acesso apenas via CloudFront)
+  # -------------------------
+  WebAppBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebAppBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipal
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${WebAppBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebAppCloudFrontDistribution}"
+
+  # -------------------------
+  # CloudFront Distribution (com domínio customizado)
+  # -------------------------
+  WebAppCloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "CloudFront para ${BucketName}"
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        Aliases:
+          - !Ref BucketName
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebAppBucket.RegionalDomainName
+            S3OriginConfig: {} # Necessário mesmo com OAC
+            OriginAccessControlId: !Ref WebAppOAC
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD"]
+          CachedMethods: ["GET", "HEAD"]
+          CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+
+Outputs:
+  BucketName:
+    Description: Nome do bucket S3
+    Value: !Ref WebAppBucket
+
+  CloudFrontDomain:
+    Description: URL do CloudFront (HTTPS)
+    Value: !GetAtt WebAppCloudFrontDistribution.DomainName
+
+  CustomDomain:
+    Description: Domínio customizado configurado
+    Value: !Ref BucketName
+
+  CloudFrontId:
+    Description: CloudFront Distribution ID
+    Value: !Ref WebAppCloudFrontDistribution

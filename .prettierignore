@@ -1,0 +1,7 @@
+bitbucket-pipelines.yml
+cloud-formation.yaml
+kstop.js
+starter.js
+index.html
+/*.js
+!jest.config.js
