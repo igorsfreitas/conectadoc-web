@@ -11,6 +11,8 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
 
   const from = (page - 1) * limit + 1;
   const to = Math.min(page * limit, total);
+  const atFirst = page <= 1;
+  const atLast  = page >= totalPages;
 
   return (
     <div className="pagination">
@@ -18,8 +20,17 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
       <div className="pagination-controls">
         <button
           className="btn btn-secondary btn-sm"
+          onClick={() => onPageChange(1)}
+          disabled={atFirst}
+          title="Primeira página"
+        >
+          «
+        </button>
+        <button
+          className="btn btn-secondary btn-sm"
           onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
+          disabled={atFirst}
+          title="Página anterior"
         >
           ‹ Anterior
         </button>
@@ -27,9 +38,18 @@ export function Pagination({ page, totalPages, total, limit, onPageChange }: Pro
         <button
           className="btn btn-secondary btn-sm"
           onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
+          disabled={atLast}
+          title="Próxima página"
         >
           Próxima ›
+        </button>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => onPageChange(totalPages)}
+          disabled={atLast}
+          title="Última página"
+        >
+          »
         </button>
       </div>
     </div>
