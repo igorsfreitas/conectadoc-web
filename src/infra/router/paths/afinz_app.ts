@@ -16,4 +16,9 @@ export const afinzAppPaths = {
     path: "/assuntos",
     asRoute: "/assuntos",
   },
+  hierarquia: {
+    name: "Hierarquia de Arquivologia",
+    path: "/hierarquia",
+    asRoute: "/hierarquia",
+  },
 };

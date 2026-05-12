@@ -5,11 +5,13 @@ import { PinErrorInterceptors } from "../services/http-client/interceptors/error
 import { LogInterceptor } from "../services/http-client/interceptors/log";
 import { ProfileService } from "../services/profile/profile.service";
 import { AssuntosService } from "../services/assuntos/assuntos.service";
+import { HierarquiaService } from "../services/hierarquia/hierarquia.service";
 
 export interface Dependences {
   AuthService: AuthService;
   ProfileService: ProfileService;
   AssuntosService: AssuntosService;
+  HierarquiaService: HierarquiaService;
 }
 
 export const DependencyInjectionContext = createContext<Dependences | null>(null);
@@ -32,6 +34,7 @@ export function DependencyInjectionManager({ children }: Props) {
     AuthService: new AuthService(httpClient),
     ProfileService: new ProfileService(httpClient),
     AssuntosService: new AssuntosService(httpClient),
+    HierarquiaService: new HierarquiaService(httpClient),
   };
 
   return (
