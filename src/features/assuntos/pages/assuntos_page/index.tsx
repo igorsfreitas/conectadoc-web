@@ -1,7 +1,8 @@
 import { useAssuntosViewModel } from '../../use_assuntos.view-model';
+import { Pagination } from '../../../../infra/components/pagination';
 
 export function AssuntosPage() {
-  const { data, loading, error, columns } = useAssuntosViewModel();
+  const { data, loading, error, columns, page, totalPages, total, limit, goToPage } = useAssuntosViewModel();
 
   return (
     <div className="content-wide">
@@ -54,6 +55,14 @@ export function AssuntosPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={goToPage}
+        />
       </div>
     </div>
   );

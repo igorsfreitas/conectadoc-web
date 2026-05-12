@@ -1,12 +1,16 @@
 import { HttpClient } from '@afinz/rest-client';
 
 import { Assunto, AssuntoPayload } from '../../../features/assuntos/models/assunto.model';
+import { Paginated } from '../../types/paginated';
 
 export class AssuntosService {
   constructor(private readonly httpClient: HttpClient) {}
 
-  async findAll(): Promise<Assunto[]> {
-    const res = await this.httpClient.get<Assunto[]>('/v1/assuntos', { withCredentials: true });
+  async findAll(page = 1, limit = 20): Promise<Paginated<Assunto>> {
+    const res = await this.httpClient.get<Paginated<Assunto>>('/v1/assuntos', {
+      withCredentials: true,
+      params: { page, limit },
+    });
     return res.data;
   }
 

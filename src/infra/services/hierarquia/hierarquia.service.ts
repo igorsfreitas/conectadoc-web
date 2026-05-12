@@ -1,11 +1,14 @@
 import { HttpClient } from "@afinz/rest-client";
 import { CreateHierarquiaPayload, HierarquiaSegmento, UpdateHierarquiaPayload } from "../../../features/hierarquia/models/hierarquia.model";
+import { Paginated } from "../../types/paginated";
 
 export class HierarquiaService {
   constructor(private readonly httpClient: HttpClient) {}
 
-  async findAll(): Promise<HierarquiaSegmento[]> {
-    const response = await this.httpClient.get<HierarquiaSegmento[]>("/v1/hierarquia");
+  async findAll(page = 1, limit = 20): Promise<Paginated<HierarquiaSegmento>> {
+    const response = await this.httpClient.get<Paginated<HierarquiaSegmento>>("/v1/hierarquia", {
+      params: { page, limit },
+    });
     return response.data;
   }
 

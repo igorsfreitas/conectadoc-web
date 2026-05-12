@@ -520,3 +520,29 @@ table.data .num {
 }
 .dialog-title { font-size: 15px; font-weight: 600; margin: 0; }
 .dialog-body  { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Pagination ─────────────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pagination-page {
+  font-size: 13px;
+  color: var(--text-2);
+  min-width: 60px;
+  text-align: center;
+}

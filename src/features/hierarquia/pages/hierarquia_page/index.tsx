@@ -1,5 +1,6 @@
 import { FormEvent, useState, useEffect, useRef } from 'react';
 import { Dialog } from '../../../../infra/components/dialog';
+import { Pagination } from '../../../../infra/components/pagination';
 import { useHierarquiaViewModel } from '../../use_hierarquia.view-model';
 import { HierarquiaSegmento } from '../../models/hierarquia.model';
 
@@ -74,6 +75,7 @@ function RowMenu({ row, onEdit, onDelete }: {
 export function HierarquiaPage() {
   const {
     data, loading, saving, error,
+    page, totalPages, total, limit, goToPage,
     dialogMode, selected,
     openCreate, openEdit, openDelete, closeDialog,
     handleCreate, handleUpdate, handleDelete,
@@ -154,6 +156,14 @@ export function HierarquiaPage() {
             )}
           </tbody>
         </table>
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={goToPage}
+        />
       </div>
 
       {/* Create / Edit */}
