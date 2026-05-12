@@ -1,35 +1,30 @@
 import { HttpClient } from "@afinz/rest-client";
-import { HierarquiaPayload, ItemArquivologia } from "../../../features/hierarquia/models/hierarquia.model";
+import { CreateHierarquiaPayload, HierarquiaSegmento, UpdateHierarquiaPayload } from "../../../features/hierarquia/models/hierarquia.model";
 
 export class HierarquiaService {
   constructor(private readonly httpClient: HttpClient) {}
 
-  async findAll(): Promise<ItemArquivologia[]> {
-    const response = await this.httpClient.get<ItemArquivologia[]>("/v1/hierarquia");
+  async findAll(): Promise<HierarquiaSegmento[]> {
+    const response = await this.httpClient.get<HierarquiaSegmento[]>("/v1/hierarquia");
     return response.data;
   }
 
-  async findRoots(): Promise<ItemArquivologia[]> {
-    const response = await this.httpClient.get<ItemArquivologia[]>("/v1/hierarquia/roots");
+  async findOne(codigo: string): Promise<HierarquiaSegmento> {
+    const response = await this.httpClient.get<HierarquiaSegmento>(`/v1/hierarquia/${codigo}`);
     return response.data;
   }
 
-  async findOne(id: string): Promise<ItemArquivologia> {
-    const response = await this.httpClient.get<ItemArquivologia>(`/v1/hierarquia/${id}`);
+  async create(payload: CreateHierarquiaPayload): Promise<HierarquiaSegmento> {
+    const response = await this.httpClient.post<HierarquiaSegmento>("/v1/hierarquia", payload);
     return response.data;
   }
 
-  async create(payload: HierarquiaPayload): Promise<ItemArquivologia> {
-    const response = await this.httpClient.post<ItemArquivologia>("/v1/hierarquia", payload);
+  async update(codigo: string, payload: UpdateHierarquiaPayload): Promise<HierarquiaSegmento> {
+    const response = await this.httpClient.patch<HierarquiaSegmento>(`/v1/hierarquia/${codigo}`, payload);
     return response.data;
   }
 
-  async update(id: string, payload: HierarquiaPayload): Promise<ItemArquivologia> {
-    const response = await this.httpClient.patch<ItemArquivologia>(`/v1/hierarquia/${id}`, payload);
-    return response.data;
-  }
-
-  async remove(id: string): Promise<void> {
-    await this.httpClient.delete(`/v1/hierarquia/${id}`);
+  async remove(codigo: string): Promise<void> {
+    await this.httpClient.delete(`/v1/hierarquia/${codigo}`);
   }
 }

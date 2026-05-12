@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from "axios";
-import { afinzStorageKeys } from "../../afinz_storage/afinz_storage_keys";
 import { ICrashReporter, ILogOptions } from "./interface";
 
 export class Vortex implements ICrashReporter {
@@ -16,27 +15,16 @@ export class Vortex implements ICrashReporter {
   }
 
   sendReport(tag: string, message: string, options: ILogOptions): void {
-    const cpf = localStorage.getItem(afinzStorageKeys.authenticatedCpf) ?? "";
-    const lastRequest =
-      localStorage.getItem(afinzStorageKeys.lastRequest) ?? "";
-    const lastBody = JSON.parse(
-      localStorage.getItem(afinzStorageKeys.lastBody) ?? "",
-    );
-
     const reportData = {
-      CPF: cpf,
-      UltimaApi: options.lastApi?.url ?? lastRequest,
-      UltimoRetorno:
-        JSON.stringify(options.lastApi?.body) ?? JSON.stringify(lastBody),
       MensagemErro: `[${tag}] ${message}`,
-      Plataforma: "PIN",
+      UltimaApi: options.lastApi?.url ?? "",
+      UltimoRetorno: JSON.stringify(options.lastApi?.body) ?? "",
+      Plataforma: "ConectaDoc",
     };
 
     this.httpClient
       .post(`/log-vortex/error`, reportData, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         withCredentials: true,
       })
       .catch((err) => {

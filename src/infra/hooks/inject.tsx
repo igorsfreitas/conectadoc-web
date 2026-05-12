@@ -1,8 +1,6 @@
 import { useContext } from "react";
 import { Dependences, DependencyInjectionContext } from "../contexts/inject";
 
-type InjectableKey = keyof Dependences;
-
-export function useInject(identifier: InjectableKey) {
+export function useInject<K extends keyof Dependences>(identifier: K): Dependences[K] {
   return useContext(DependencyInjectionContext)![identifier];
 }

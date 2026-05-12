@@ -8,7 +8,7 @@ export function HierarquiaPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1>Hierarquia de Arquivologia</h1>
+        <h1>Hierarquias</h1>
       </header>
 
       {error && <p className={styles.error}>{error}</p>}
@@ -16,7 +16,7 @@ export function HierarquiaPage() {
       <DataTable
         columns={columns}
         data={data}
-        keyExtractor={(r) => r.id}
+        keyExtractor={(r) => r.codigo}
         loading={loading}
       />
     </div>
