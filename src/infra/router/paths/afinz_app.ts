@@ -26,4 +26,9 @@ export const afinzAppPaths = {
     path: "/tipo-entidade-externa",
     asRoute: "/tipo-entidade-externa",
   },
+  entidadeExterna: {
+    name: "Entidades Externas",
+    path: "/entidade-externa",
+    asRoute: "/entidade-externa",
+  },
 };

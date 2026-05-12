@@ -7,6 +7,7 @@ import { ProfileService } from "../services/profile/profile.service";
 import { AssuntosService } from "../services/assuntos/assuntos.service";
 import { HierarquiaService } from "../services/hierarquia/hierarquia.service";
 import { TipoEntidadeExternaService } from "../services/tipo-entidade-externa/tipo-entidade-externa.service";
+import { EntidadeExternaService } from "../services/entidade-externa/entidade-externa.service";
 
 export interface Dependences {
   AuthService: AuthService;
@@ -14,6 +15,7 @@ export interface Dependences {
   AssuntosService: AssuntosService;
   HierarquiaService: HierarquiaService;
   TipoEntidadeExternaService: TipoEntidadeExternaService;
+  EntidadeExternaService: EntidadeExternaService;
 }
 
 export const DependencyInjectionContext = createContext<Dependences | null>(null);
@@ -38,6 +40,7 @@ export function DependencyInjectionManager({ children }: Props) {
     AssuntosService: new AssuntosService(httpClient),
     HierarquiaService: new HierarquiaService(httpClient),
     TipoEntidadeExternaService: new TipoEntidadeExternaService(httpClient),
+    EntidadeExternaService: new EntidadeExternaService(httpClient),
   };
 
   return (
