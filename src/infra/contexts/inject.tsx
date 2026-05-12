@@ -6,12 +6,14 @@ import { LogInterceptor } from "../services/http-client/interceptors/log";
 import { ProfileService } from "../services/profile/profile.service";
 import { AssuntosService } from "../services/assuntos/assuntos.service";
 import { HierarquiaService } from "../services/hierarquia/hierarquia.service";
+import { TipoEntidadeExternaService } from "../services/tipo-entidade-externa/tipo-entidade-externa.service";
 
 export interface Dependences {
   AuthService: AuthService;
   ProfileService: ProfileService;
   AssuntosService: AssuntosService;
   HierarquiaService: HierarquiaService;
+  TipoEntidadeExternaService: TipoEntidadeExternaService;
 }
 
 export const DependencyInjectionContext = createContext<Dependences | null>(null);
@@ -35,6 +37,7 @@ export function DependencyInjectionManager({ children }: Props) {
     ProfileService: new ProfileService(httpClient),
     AssuntosService: new AssuntosService(httpClient),
     HierarquiaService: new HierarquiaService(httpClient),
+    TipoEntidadeExternaService: new TipoEntidadeExternaService(httpClient),
   };
 
   return (
