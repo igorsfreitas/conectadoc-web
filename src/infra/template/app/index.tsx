@@ -41,8 +41,8 @@ export function AppLayout() {
       {/* ── Sidebar ─────────────────────────────────────────────── */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">C</div>
-          <div className="brand-text">conecta<span>doc</span></div>
+          <img src="/favicon.ico" alt="ConectaDoc" className="brand-favicon" />
+          <div className="brand-text">CONECTA<span>DOC</span></div>
         </div>
 
         <div className="sidebar-tenant">

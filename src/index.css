@@ -160,24 +160,19 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border);
   height: var(--header-h);
 }
-.brand-mark {
-  width: 28px; height: 28px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
-  display: grid; place-items: center;
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: -0.02em;
+.brand-favicon {
+  width: 32px; height: 32px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 .brand-text {
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: 0.01em;
   font-size: 15px;
-  color: var(--text);
+  color: #1a3a6b;
+  text-transform: uppercase;
 }
-.brand-text span { color: var(--primary); font-weight: 600; }
+.brand-text span { color: #2eaadc; font-weight: 800; }
 
 .sidebar-tenant {
   padding: 10px 12px;
