@@ -6,7 +6,7 @@ export class ProfileService {
 
   async getProfile(): Promise<ProfileResponse | AfinzApiError> {
     try {
-      const response = await this.httpClient.get<ProfileResponse>(`/auth/me`, {
+      const response = await this.httpClient.get<ProfileResponse>(`/v1/auth/me`, {
         withCredentials: true,
       });
 

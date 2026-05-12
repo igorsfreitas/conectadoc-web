@@ -52,8 +52,8 @@ export class PinErrorInterceptors implements HttpErrorInterceptors {
           break;
         case 401:
           errorMessage = "Sessão expirada. Faça login novamente";
-          if (window.location.pathname != afinzAppPaths.investiment.auth.path) {
-            window.location.href = afinzAppPaths.investiment.auth.path;
+          if (window.location.pathname !== afinzAppPaths.login.path) {
+            window.location.href = afinzAppPaths.login.path;
           }
           break;
         case 403:
@@ -64,7 +64,6 @@ export class PinErrorInterceptors implements HttpErrorInterceptors {
           break;
         case 422:
           errorMessage = errorMessage || "Dados inválidos enviados";
-
           break;
         case 500:
         case 502:

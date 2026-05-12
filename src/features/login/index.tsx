@@ -1,38 +1,64 @@
-import styles from "./style.module.scss";
-
-import { AfinzLogo } from "@afinz/design-system";
-import { DocumentStep } from "./components/document_step";
-import { LoginManager } from "./contexts/login_context";
-import { LoginDrawerStackManager } from "./contexts/login_drawer_stack";
-import { FirstAccessModal } from "./dialogs/first_access_modal";
+import { FormEvent, useContext, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AfinzApiError } from "@afinz/rest-client";
+import { useInject } from "../../infra/hooks/inject";
+import { afinzAppPaths } from "../../infra/router/paths/afinz_app";
 
 export function Login() {
-  return (
-    <LoginManager>
-      <LoginDrawerStackManager>
-        <LoginContent />
-      </LoginDrawerStackManager>
-    </LoginManager>
-  );
-}
+  const authService = useInject("AuthService");
+  const navigate = useNavigate();
 
-function LoginContent() {
+  const [cpf, setCpf] = useState("");
+  const [senha, setSenha] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await authService.login({ cpf, senha });
+      if (result instanceof AfinzApiError) {
+        setError(result.message);
+      } else {
+        navigate(afinzAppPaths.assuntos.asRoute, { replace: true });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <>
-      <FirstAccessModal />
-      <div className={styles.login}>
-        <main className={styles.container}>
-          <aside className={styles.aside}>
-            <div className={styles.asideContent}>
-              <h2>
-                Bem-vindo, <br /> Investidor
-              </h2>
-              <AfinzLogo />
-            </div>
-          </aside>
-          <DocumentStep />
-        </main>
-      </div>
-    </>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", width: 320 }}>
+        <h2>ConectaDoc</h2>
+        {error && <p style={{ color: "red" }}>{error}</p>}
+        <label>
+          CPF
+          <input
+            type="text"
+            value={cpf}
+            onChange={(e) => setCpf(e.target.value)}
+            placeholder="000.000.000-00"
+            required
+            style={{ display: "block", width: "100%", marginTop: 4 }}
+          />
+        </label>
+        <label>
+          Senha
+          <input
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+            style={{ display: "block", width: "100%", marginTop: 4 }}
+          />
+        </label>
+        <button type="submit" disabled={loading}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+      </form>
+    </div>
   );
 }

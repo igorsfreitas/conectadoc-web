@@ -12,6 +12,12 @@ export default defineConfig({
       key: fs.readFileSync(path.resolve(__dirname, "cert/localhost-key.pem")),
       cert: fs.readFileSync(path.resolve(__dirname, "cert/localhost.pem")),
     },
+    proxy: {
+      "/v1": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+    },
   },
   css: {
     preprocessorOptions: {

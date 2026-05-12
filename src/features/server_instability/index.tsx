@@ -1,31 +1,26 @@
-import { AfinzServerInstabilityPage } from "@afinz/design-system";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useAfinzNavigate } from "../../infra/hooks/afinz_navigator";
+import { useNavigate } from "react-router-dom";
 import { afinzAppPaths } from "../../infra/router/paths/afinz_app";
 
 interface Props {
   retry?: () => unknown;
 }
 
-export function ServerInstabilityPage(props: Props) {
-  const navigate = useAfinzNavigate();
-  const [searchParams] = useSearchParams();
-  const [nextRoute, setNextRoute] = useState<string | null>(null);
+export function ServerInstabilityPage({ retry }: Props) {
+  const navigate = useNavigate();
 
-  async function tryLoadProfileAgain() {
-    navigate(nextRoute ?? afinzAppPaths.investiment.asRoute);
+  function handleRetry() {
+    if (retry) {
+      retry();
+    } else {
+      navigate(afinzAppPaths.assuntos.asRoute);
+    }
   }
 
-  useEffect(() => {
-    setNextRoute(searchParams.get("next"));
-  }, []);
-
   return (
-    <div className="page-content">
-      <AfinzServerInstabilityPage
-        retry={props.retry ? props.retry : tryLoadProfileAgain}
-      />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "1rem" }}>
+      <h2>Serviço indisponível</h2>
+      <p>Não foi possível completar a operação. Tente novamente.</p>
+      <button onClick={handleRetry}>Tentar novamente</button>
     </div>
   );
 }

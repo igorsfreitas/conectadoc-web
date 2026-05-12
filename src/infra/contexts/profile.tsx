@@ -1,65 +1,41 @@
-import { AfinzApiError } from "@afinz/rest-client";
-import { ReactElement, createContext, useState } from "react";
-import { afinzStorageKeys } from "../afinz_storage/afinz_storage_keys";
+import { createContext, ReactElement, useState } from "react";
 import { useInject } from "../hooks/inject";
 import { ProfileResponse } from "../services/profile/profile.model";
-import { ProfileService } from "../services/profile/profile.service";
 
-export interface Context {
+export interface ProfileContextType {
   profile?: ProfileResponse;
   loadingProfile: boolean;
-
   loadProfile(): Promise<void>;
 }
 
-export const ProfileContext = createContext<Context>({
+export const ProfileContext = createContext<ProfileContextType>({
   profile: undefined,
   loadingProfile: false,
-
   async loadProfile() {},
 });
 
 export function ProfileManager({ children }: { children: ReactElement }) {
-  const profileService = useInject("ProfileService") as ProfileService;
+  const profileService = useInject("ProfileService");
 
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [profile, setProfile] = useState<ProfileResponse | undefined>();
 
-  function getAuthenticatedCpf(): string | undefined {
-    return localStorage.getItem(afinzStorageKeys.authenticatedCpf) ?? undefined;
-  }
-
   async function loadProfile(): Promise<void> {
     if (profile) return;
-
-    const cpf = getAuthenticatedCpf();
-
-    if (cpf) {
-      setLoadingProfile(true);
-
+    setLoadingProfile(true);
+    try {
       const response = await profileService.getProfile();
-
-      setLoadingProfile(false);
-
-      if (response instanceof AfinzApiError) {
-        setProfile(undefined);
+      if (!(response instanceof Error)) {
+        setProfile(response as ProfileResponse);
       }
-
-      setProfile(response as ProfileResponse);
+    } finally {
+      setLoadingProfile(false);
     }
   }
 
   return (
-    <ProfileContext.Provider
-      value={{
-        profile,
-        loadingProfile,
-        loadProfile,
-      }}
-    >
+    <ProfileContext.Provider value={{ profile, loadingProfile, loadProfile }}>
       {children}
     </ProfileContext.Provider>
   );
 }
-
-export type ProfileContextType = Context;
