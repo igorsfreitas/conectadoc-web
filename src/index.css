@@ -1,0 +1,91 @@
+/* ── ConectaDoc Design Tokens ───────────────────────────────────────────────
+   Fonte da verdade: handoff claude.ai/design (2026-05-09).
+   Usar var(--token) em SCSS Modules; não duplicar valores aqui nos arquivos .scss.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* brand */
+  --cd-brand-500: oklch(0.55 0.16 250);
+  --cd-primary:   oklch(0.47 0.16 250);
+  --cd-primary-hover: oklch(0.40 0.14 250);
+  --cd-primary-soft:  oklch(0.94 0.025 250);
+
+  /* surfaces */
+  --cd-bg:        oklch(0.98 0.006 250);
+  --cd-surface:   #ffffff;
+  --cd-surface-2: oklch(0.965 0.008 250);
+  --cd-border:    oklch(0.92 0.012 250);
+  --cd-border-strong: oklch(0.85 0.018 250);
+
+  /* text */
+  --cd-text:   oklch(0.16 0.008 250);
+  --cd-text-2: oklch(0.35 0.012 250);
+  --cd-text-3: oklch(0.58 0.016 250);
+
+  /* status */
+  --cd-success: oklch(0.55 0.15 145);
+  --cd-warning: oklch(0.62 0.16 70);
+  --cd-danger:  oklch(0.52 0.20 25);
+  --cd-info:    oklch(0.55 0.14 230);
+
+  --cd-success-bg: oklch(0.95 0.04 145);
+  --cd-warning-bg: oklch(0.96 0.05 70);
+  --cd-danger-bg:  oklch(0.96 0.04 25);
+  --cd-info-bg:    oklch(0.95 0.03 230);
+
+  /* radius */
+  --cd-radius-sm: 6px;
+  --cd-radius:    10px;
+  --cd-radius-lg: 14px;
+  --cd-radius-xl: 20px;
+
+  /* layout */
+  --cd-sidebar-w: 248px;
+  --cd-header-h:  60px;
+
+  /* density — override on <body> via DensityContext */
+  --cd-density-row: 44px;
+
+  /* shadows */
+  --cd-shadow-xs: 0 1px 2px oklch(0 0 0 / 0.04);
+  --cd-shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08), 0 1px 2px oklch(0 0 0 / 0.04);
+  --cd-shadow:    0 4px 6px oklch(0 0 0 / 0.07), 0 2px 4px oklch(0 0 0 / 0.06);
+  --cd-shadow-lg: 0 10px 15px oklch(0 0 0 / 0.10), 0 4px 6px oklch(0 0 0 / 0.05);
+  --cd-shadow-xl: 0 20px 25px oklch(0 0 0 / 0.10), 0 10px 10px oklch(0 0 0 / 0.04);
+
+  /* typography */
+  --cd-font-sans: 'Inter', system-ui, sans-serif;
+  --cd-font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+
+.theme-dark {
+  --cd-bg:        oklch(0.12 0.008 250);
+  --cd-surface:   oklch(0.17 0.010 250);
+  --cd-surface-2: oklch(0.20 0.010 250);
+  --cd-border:    oklch(0.28 0.012 250);
+  --cd-border-strong: oklch(0.35 0.015 250);
+  --cd-text:      oklch(0.93 0.006 250);
+  --cd-text-2:    oklch(0.72 0.010 250);
+  --cd-text-3:    oklch(0.55 0.012 250);
+}
+
+/* ── Density overrides (aplicado no <body> via DensityContext) ───────────── */
+
+.density-compact     { --cd-density-row: 36px; }
+.density-comfortable { --cd-density-row: 52px; }
+
+/* ── Reset mínimo ────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--cd-bg);
+  color: var(--cd-text);
+  font-family: var(--cd-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
