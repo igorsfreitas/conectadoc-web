@@ -24,10 +24,17 @@ const IconUsers = (p: { size?: number }) => <Icon {...p}><path d="M17 21v-2a4 4 
 
 const IconBuilding = (p: { size?: number }) => <Icon {...p}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22V12h6v10"/><path d="M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/></Icon>;
 
+const IconDocument = (p: { size?: number }) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>;
+const IconKey      = (p: { size?: number }) => <Icon {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></Icon>;
+
 const NAV_GESTAO = [
   { path: afinzAppPaths.hierarquia.asRoute!,          label: 'Hierarquia',           Icon: IconSettings  },
   { path: afinzAppPaths.tipoEntidadeExterna.asRoute!, label: 'Tipo Entidade Externa', Icon: IconUsers     },
-  { path: afinzAppPaths.entidadeExterna.asRoute!,     label: 'Entidades Externas',    Icon: IconBuilding  },
+  { path: afinzAppPaths.entidadeExterna.asRoute!,         label: 'Entidades Externas',      Icon: IconBuilding  },
+  { path: afinzAppPaths.unidadeAdministrativa.asRoute!,   label: 'Unid. Administrativas',   Icon: IconFolder    },
+  { path: afinzAppPaths.tipoDocumento.asRoute!,           label: 'Tipos de Documento',       Icon: IconDocument  },
+  { path: afinzAppPaths.casoUso.asRoute!,                label: 'Casos de Uso',             Icon: IconKey       },
+  { path: afinzAppPaths.perfis.asRoute!,                 label: 'Perfis',                   Icon: IconUsers     },
 ];
 
 export function AppLayout() {
@@ -123,6 +130,10 @@ function getBreadcrumb(pathname: string): string {
   if (pathname.startsWith('/assuntos'))              return 'Assuntos';
   if (pathname.startsWith('/hierarquia'))            return 'Hierarquia';
   if (pathname.startsWith('/tipo-entidade-externa')) return 'Tipo de Entidade Externa';
-  if (pathname.startsWith('/entidade-externa'))      return 'Entidades Externas';
+  if (pathname.startsWith('/entidade-externa'))           return 'Entidades Externas';
+  if (pathname.startsWith('/unidade-administrativa'))     return 'Unidades Administrativas';
+  if (pathname.startsWith('/tipo-documento'))            return 'Tipos de Documento';
+  if (pathname.startsWith('/caso-uso'))                  return 'Casos de Uso';
+  if (pathname.startsWith('/perfis'))                    return 'Perfis';
   return '';
 }

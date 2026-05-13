@@ -31,4 +31,29 @@ export const afinzAppPaths = {
     path: "/entidade-externa",
     asRoute: "/entidade-externa",
   },
+  unidadeAdministrativa: {
+    name: "Unidades Administrativas",
+    path: "/unidade-administrativa",
+    asRoute: "/unidade-administrativa",
+  },
+  tipoDocumento: {
+    name: "Tipos de Documento",
+    path: "/tipo-documento",
+    asRoute: "/tipo-documento",
+  },
+  casoUso: {
+    name: "Casos de Uso",
+    path: "/caso-uso",
+    asRoute: "/caso-uso",
+  },
+  perfis: {
+    name: "Perfis",
+    path: "/perfis",
+    asRoute: "/perfis",
+  },
+  usuarios: {
+    name: "Usuários",
+    path: "/usuarios",
+    asRoute: "/usuarios",
+  },
 };
