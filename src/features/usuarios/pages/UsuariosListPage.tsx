@@ -28,12 +28,12 @@ export function UsuariosListPage() {
   const [page, setPage]       = useState(1);
   const [total, setTotal]     = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [filter, setFilter]   = useState<UsuarioFilter>({ ativo: true });
+  const [filter, setFilter]   = useState<UsuarioFilter>({});
 
   const [fNome, setFNome]         = useState('');
   const [fCpf, setFCpf]           = useState('');
   const [fMatricula, setFMatricula] = useState('');
-  const [fAtivo, setFAtivo]       = useState(true);
+  const [fAtivo, setFAtivo]       = useState(false);
   const [fInativo, setFInativo]   = useState(false);
 
   const load = useCallback(async (p: number, f: UsuarioFilter) => {
@@ -60,8 +60,8 @@ export function UsuariosListPage() {
 
   function handleClear() {
     setFNome(''); setFCpf(''); setFMatricula('');
-    setFAtivo(true); setFInativo(false);
-    setFilter({ ativo: true }); setPage(1);
+    setFAtivo(false); setFInativo(false);
+    setFilter({}); setPage(1);
   }
 
   return (

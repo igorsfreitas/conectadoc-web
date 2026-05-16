@@ -17,7 +17,10 @@ export default defineConfig({
         target: "http://localhost:3000",
         changeOrigin: true,
         headers: {
-          "x-tenant": "prefeitura",
+          // Fallback de tenant pro proxy quando a chamada não vem do axios
+          // (ex.: navegação direta a /v1/auth/govbr/login). Chamadas via
+          // axios são sobrescritas pelo TenantInterceptor (VITE_APP_TENANT).
+          "x-tenant": process.env.VITE_APP_TENANT ?? "amtt",
         },
       },
     },

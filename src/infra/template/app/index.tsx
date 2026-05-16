@@ -35,6 +35,7 @@ const NAV_GESTAO = [
   { path: afinzAppPaths.tipoDocumento.asRoute!,           label: 'Tipos de Documento',       Icon: IconDocument  },
   { path: afinzAppPaths.casoUso.asRoute!,                label: 'Casos de Uso',             Icon: IconKey       },
   { path: afinzAppPaths.perfis.asRoute!,                 label: 'Perfis',                   Icon: IconUsers     },
+  { path: afinzAppPaths.usuarios.asRoute!,               label: 'Usuários',                 Icon: IconUsers     },
 ];
 
 export function AppLayout() {
@@ -135,5 +136,6 @@ function getBreadcrumb(pathname: string): string {
   if (pathname.startsWith('/tipo-documento'))            return 'Tipos de Documento';
   if (pathname.startsWith('/caso-uso'))                  return 'Casos de Uso';
   if (pathname.startsWith('/perfis'))                    return 'Perfis';
+  if (pathname.startsWith('/usuarios'))                  return 'Usuários';
   return '';
 }

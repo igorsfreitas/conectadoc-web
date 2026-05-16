@@ -10,6 +10,8 @@ import { TipoDocumentoListPage } from "../../features/tipo-documento/pages/TipoD
 import { TipoDocumentoFormPage } from "../../features/tipo-documento/pages/TipoDocumentoFormPage";
 import { CasoUsoPage } from "../../features/caso-uso/pages/caso_uso_page";
 import { PerfisPage } from "../../features/perfis/pages/perfis_page";
+import { UsuariosListPage } from "../../features/usuarios/pages/UsuariosListPage";
+import { UsuariosFormPage } from "../../features/usuarios/pages/UsuariosFormPage";
 import { AppLayout } from "../template/app/index";
 import { afinzAppPaths } from "./paths/afinz_app";
 
@@ -30,6 +32,9 @@ export function Router() {
           <Route path={`${afinzAppPaths.tipoDocumento.asRoute}/:codigo`} element={<TipoDocumentoFormPage />} />
           <Route path={afinzAppPaths.casoUso.asRoute} element={<CasoUsoPage />} />
           <Route path={afinzAppPaths.perfis.asRoute} element={<PerfisPage />} />
+          <Route path={afinzAppPaths.usuarios.asRoute} element={<UsuariosListPage />} />
+          <Route path={`${afinzAppPaths.usuarios.asRoute}/novo`} element={<UsuariosFormPage />} />
+          <Route path={`${afinzAppPaths.usuarios.asRoute}/:codigo`} element={<UsuariosFormPage />} />
         </Route>
         <Route path="*" element={<ServerInstabilityPage />} />
       </Routes>
