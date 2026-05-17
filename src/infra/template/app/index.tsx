@@ -1,4 +1,7 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
+import { useContext } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { ProfileContext } from "../../contexts/profile";
+import { useInject } from "../../hooks/inject";
 import { afinzAppPaths } from "../../router/paths/afinz_app";
 
 // ── Inline SVG icons (Lucide-style) ───────────────────────────────────────
@@ -40,15 +43,24 @@ const NAV_GESTAO = [
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { profile, setProfile } = useContext(ProfileContext);
+  const authService = useInject("AuthService");
 
   const initials = (name: string) =>
     name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
-  const tenantName  = 'Prefeitura Municipal';
-  const tenantRole  = 'SEGOV · Gabinete';
-  const tenantInitials = 'PM';
-  const userName    = 'Usuário';
+  const userName     = profile?.usuario?.nome ?? 'Usuário';
   const userInitials = initials(userName);
+  const tenantName     = 'ConectaDoc';
+  const tenantRole     = '';
+  const tenantInitials = 'CD';
+
+  async function handleLogout() {
+    try { await authService.logout(); } catch { /* ignore */ }
+    setProfile(undefined);
+    navigate(afinzAppPaths.login.path!);
+  }
 
   return (
     <div className="app">
@@ -100,7 +112,7 @@ export function AppLayout() {
             <div className="user-name">{userName}</div>
             <div className="user-id">ConectaDoc</div>
           </div>
-          <button className="icon-btn" title="Sair">
+          <button className="icon-btn" title="Sair" onClick={handleLogout}>
             <IconLogout size={16} />
           </button>
         </div>

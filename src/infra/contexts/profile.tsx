@@ -1,40 +1,37 @@
-import { createContext, ReactElement, useState } from "react";
+import { createContext, ReactElement, useEffect, useState } from "react";
 import { useInject } from "../hooks/inject";
 import { ProfileResponse } from "../services/profile/profile.model";
 
 export interface ProfileContextType {
   profile?: ProfileResponse;
   loadingProfile: boolean;
-  loadProfile(): Promise<void>;
+  setProfile(p: ProfileResponse | undefined): void;
 }
 
 export const ProfileContext = createContext<ProfileContextType>({
   profile: undefined,
-  loadingProfile: false,
-  async loadProfile() {},
+  loadingProfile: true,
+  setProfile() {},
 });
 
 export function ProfileManager({ children }: { children: ReactElement }) {
   const profileService = useInject("ProfileService");
 
-  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [profile, setProfile] = useState<ProfileResponse | undefined>();
 
-  async function loadProfile(): Promise<void> {
-    if (profile) return;
-    setLoadingProfile(true);
-    try {
-      const response = await profileService.getProfile();
-      if (!(response instanceof Error)) {
-        setProfile(response as ProfileResponse);
-      }
-    } finally {
-      setLoadingProfile(false);
-    }
-  }
+  useEffect(() => {
+    profileService
+      .getProfile()
+      .then((res) => {
+        if (!(res instanceof Error)) setProfile(res as ProfileResponse);
+      })
+      .finally(() => setLoadingProfile(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <ProfileContext.Provider value={{ profile, loadingProfile, loadProfile }}>
+    <ProfileContext.Provider value={{ profile, loadingProfile, setProfile }}>
       {children}
     </ProfileContext.Provider>
   );
