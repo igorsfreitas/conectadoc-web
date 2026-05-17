@@ -2,10 +2,10 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useNavigate, useParams } from 'react-router-dom';
 import { Autocomplete, AutocompleteOption } from '../../../infra/components/autocomplete';
 import { useInject } from '../../../infra/hooks/inject';
-import { PerfilSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
+import { LogAcesso, PerfilSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
 
-type Tab = 'dados' | 'perfis' | 'foto' | 'assinatura';
+type Tab = 'dados' | 'perfis' | 'foto' | 'assinatura' | 'logs';
 
 function IconArrowLeft({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="19 12 5 12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -99,6 +99,10 @@ export function UsuariosFormPage() {
   const [isDrawing, setIsDrawing] = useState(false);
   const lastPos        = useRef<{ x: number; y: number } | null>(null);
 
+  // Logs de acesso
+  const [logs, setLogs]           = useState<LogAcesso[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(p => ({ ...p, [k]: v }));
   }
@@ -132,6 +136,16 @@ export function UsuariosFormPage() {
       .then(r => setTodosPerfis(r.data as PerfilSimple[]))
       .catch(() => {});
   }, [isEdit, perfisService]);
+
+  // Carregar logs de acesso ao abrir a aba
+  useEffect(() => {
+    if (!isEdit || tab !== 'logs') return;
+    setLogsLoading(true);
+    service.findLogsAcesso(Number(codigo))
+      .then(setLogs)
+      .catch(() => {})
+      .finally(() => setLogsLoading(false));
+  }, [isEdit, tab, codigo, service]);
 
   // Autocomplete: busca Unidade Administrativa (nome OU sigla)
   const fetchSegmentos = useCallback(async (q: string): Promise<AutocompleteOption[]> => {
@@ -353,7 +367,7 @@ export function UsuariosFormPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-        {([ ['dados', 'Dados Pessoais'], ['perfis', 'Perfis'], ...(isEdit ? [['foto', 'Foto'], ['assinatura', 'Assinatura']] : [])] as [Tab, string][]).map(([t, label]) => (
+        {([ ['dados', 'Dados Pessoais'], ['perfis', 'Perfis'], ...(isEdit ? [['foto', 'Foto'], ['assinatura', 'Assinatura'], ['logs', 'Logs de Acesso']] : [])] as [Tab, string][]).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '9px 18px', border: 'none', background: 'none', cursor: 'pointer',
             fontSize: 13.5, fontWeight: tab === t ? 600 : 400,
@@ -681,6 +695,64 @@ export function UsuariosFormPage() {
                 JPEG, PNG, WebP · máx. 5 MB · fundo branco recomendado
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab: Logs de Acesso ── */}
+      {tab === 'logs' && (
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Logs de Acesso</h3>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Últimos 50 registros</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th style={{ width: 180 }}>Data / Hora</th>
+                  <th style={{ width: 140 }}>IP</th>
+                  <th>Navegador / Dispositivo</th>
+                  <th style={{ width: 90, textAlign: 'center' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logsLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i}>
+                      {[180, 140, undefined, 90].map((w, j) => (
+                        <td key={j} style={{ width: w }}>
+                          <div style={{ height: 14, borderRadius: 4, background: 'var(--surface-2)', width: '80%' }} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : logs.length === 0 ? (
+                  <tr><td colSpan={4} className="empty-state">Nenhum registro de acesso encontrado.</td></tr>
+                ) : (
+                  logs.map(log => (
+                    <tr key={log.codigo}>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12.5 }}>
+                        {new Date(log.dataAcesso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                      </td>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12.5 }}>
+                        {log.ip ?? '—'}
+                      </td>
+                      <td style={{ fontSize: 12.5, color: 'var(--text-2)', maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {log.userAgent ?? '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {log.status === 'SUCESSO' ? (
+                          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 20, background: '#f0fdf4', color: '#16a34a', fontWeight: 600 }}>Sucesso</span>
+                        ) : (
+                          <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 20, background: '#fef2f2', color: 'var(--danger-500)', fontWeight: 600 }}>Falha</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

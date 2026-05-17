@@ -1,5 +1,5 @@
 import { HttpClient } from '@afinz/rest-client';
-import { Usuario, UsuarioFilter, UsuarioPayload, PerfilSimple } from '../../../features/usuarios/models/usuario.model';
+import { Usuario, UsuarioFilter, UsuarioPayload, PerfilSimple, LogAcesso } from '../../../features/usuarios/models/usuario.model';
 import { Paginated } from '../../types/paginated';
 
 export class UsuariosService {
@@ -8,6 +8,23 @@ export class UsuariosService {
   async findAll(page = 1, limit = 50, filter: UsuarioFilter = {}): Promise<Paginated<Usuario>> {
     const res = await this.httpClient.get<Paginated<Usuario>>('/v1/usuarios', { params: { page, limit, ...filter } });
     return res.data;
+  }
+
+  async downloadRelatorio(filter: UsuarioFilter = {}): Promise<void> {
+    const params = new URLSearchParams(
+      Object.entries(filter)
+        .filter(([, v]) => v !== undefined && v !== '')
+        .map(([k, v]) => [k, String(v)]),
+    );
+    const url = `/v1/usuarios/relatorio${params.size ? '?' + params.toString() : ''}`;
+    const res = await this.httpClient.get<Blob>(url, { responseType: 'blob' });
+    const blob = new Blob([res.data as unknown as BlobPart], { type: 'application/pdf' });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = 'relatorio-usuarios.pdf';
+    a.click();
+    URL.revokeObjectURL(href);
   }
 
   async findAllExport(filter: UsuarioFilter = {}): Promise<Usuario[]> {
@@ -76,5 +93,10 @@ export class UsuariosService {
 
   async removeAssinatura(id: number): Promise<void> {
     await this.httpClient.delete(`/v1/usuarios/${id}/assinatura`);
+  }
+
+  async findLogsAcesso(id: number): Promise<LogAcesso[]> {
+    const res = await this.httpClient.get<LogAcesso[]>(`/v1/usuarios/${id}/logs-acesso`);
+    return res.data;
   }
 }

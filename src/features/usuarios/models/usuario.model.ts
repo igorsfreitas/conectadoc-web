@@ -72,6 +72,15 @@ export interface PerfilSimple {
   nome: string | null;
 }
 
+export interface LogAcesso {
+  codigo: number;
+  codigoUsuario: number;
+  dataAcesso: string;
+  ip: string | null;
+  userAgent: string | null;
+  status: 'SUCESSO' | 'FALHA';
+}
+
 export const TIPO_SANGUINEO: Record<number, string> = {
   1: 'A+', 2: 'A-', 3: 'B+', 4: 'B-',
   5: 'AB+', 6: 'AB-', 7: 'O+', 8: 'O-',
