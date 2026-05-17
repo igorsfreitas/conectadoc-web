@@ -1,5 +1,26 @@
 export type CaixaTab = 'entrada' | 'saida' | 'posse' | 'pendencia' | 'circular' | 'gerencia';
 
+export interface TipoDocumentoSimples {
+  codigo: string;
+  nome: string | null;
+  sigla: string | null;
+}
+
+export interface CreateDocumentoPayload {
+  codigoTipoDocumento: number;
+  codigoAssunto?: number;
+  codigoSegmentoDestino?: number;
+  resumo: string;
+  despacho?: string;
+  flagConfidencial?: number;
+}
+
+export interface CreateDocumentoResponse {
+  codigo: number;
+  numeroNetdoc: string;
+  codigoTramitacao: number | null;
+}
+
 export interface CaixaItem {
   tramitacaoCodigo: number;
   dataEnvio: string | null;

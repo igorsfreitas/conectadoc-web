@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useInject } from "../../../infra/hooks/inject";
 import { ProfileContext } from "../../../infra/contexts/profile";
+import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CaixaItem, CaixaResponse, CaixaCounts, CaixaTab } from "../models/documento.model";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -29,6 +31,7 @@ const TABS: { key: CaixaTab; label: string }[] = [
 
 // ── component ─────────────────────────────────────────────────────────────────
 export function CaixaEntradaPage() {
+  const navigate = useNavigate();
   const service = useInject("DocumentosService");
   const { profile } = useContext(ProfileContext);
 
@@ -111,6 +114,13 @@ export function CaixaEntradaPage() {
             onClick={() => load(tab, page, search)}
           >
             ↺ Atualizar
+          </button>
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: 13, height: 36 }}
+            onClick={() => navigate(afinzAppPaths.novoDocumento.asRoute!)}
+          >
+            + Novo Documento
           </button>
           {selected.size > 0 && (
             <button className="btn btn-primary" style={{ fontSize: 13, height: 36 }}>

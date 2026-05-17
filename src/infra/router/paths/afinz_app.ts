@@ -61,4 +61,9 @@ export const afinzAppPaths = {
     path: "/caixa",
     asRoute: "/caixa",
   },
+  novoDocumento: {
+    name: "Novo Documento",
+    path: "/documentos/novo",
+    asRoute: "/documentos/novo",
+  },
 };

@@ -1,5 +1,11 @@
 import { HttpClient } from '@afinz/rest-client';
-import { CaixaResponse, CaixaTab } from '../../../features/documentos/models/documento.model';
+import {
+  CaixaResponse,
+  CaixaTab,
+  CreateDocumentoPayload,
+  CreateDocumentoResponse,
+  TipoDocumentoSimples,
+} from '../../../features/documentos/models/documento.model';
 
 export class DocumentosService {
   constructor(private readonly httpClient: HttpClient) {}
@@ -19,6 +25,16 @@ export class DocumentosService {
     const res = await this.httpClient.get<CaixaResponse>(
       `/v1/documentos/caixa?${query.toString()}`,
     );
+    return res.data;
+  }
+
+  async findTiposInterno(): Promise<TipoDocumentoSimples[]> {
+    const res = await this.httpClient.get<TipoDocumentoSimples[]>('/v1/documentos/tipos-interno');
+    return res.data;
+  }
+
+  async criar(payload: CreateDocumentoPayload): Promise<CreateDocumentoResponse> {
+    const res = await this.httpClient.post<CreateDocumentoResponse>('/v1/documentos', payload);
     return res.data;
   }
 }

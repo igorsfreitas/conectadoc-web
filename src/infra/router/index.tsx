@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Login } from "../../features/login";
 import { ServerInstabilityPage } from "../../features/server_instability";
 import { CaixaEntradaPage } from "../../features/documentos/pages/CaixaEntradaPage";
+import { NovoDocumentoPage } from "../../features/documentos/pages/NovoDocumentoPage";
 import { AssuntosPage } from "../../features/assuntos/pages/assuntos_page";
 import { HierarquiaPage } from "../../features/hierarquia/pages/hierarquia_page";
 import { TipoEntidadeExternaPage } from "../../features/tipo-entidade-externa/pages/tipo_entidade_externa_page";
@@ -37,6 +38,7 @@ function ProtectedRoutes() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path={afinzAppPaths.caixaEntrada.asRoute} element={<CaixaEntradaPage />} />
+        <Route path={afinzAppPaths.novoDocumento.asRoute} element={<NovoDocumentoPage />} />
         <Route path={afinzAppPaths.assuntos.asRoute} element={<AssuntosPage />} />
         <Route path={afinzAppPaths.hierarquia.asRoute} element={<HierarquiaPage />} />
         <Route path={afinzAppPaths.tipoEntidadeExterna.asRoute} element={<TipoEntidadeExternaPage />} />

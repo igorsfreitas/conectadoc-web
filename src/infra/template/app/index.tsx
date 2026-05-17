@@ -143,6 +143,7 @@ export function AppLayout() {
 }
 
 function getBreadcrumb(pathname: string): string {
+  if (pathname.startsWith('/documentos/novo'))      return 'Novo Documento';
   if (pathname.startsWith('/caixa'))                return 'Caixa de Entrada';
   if (pathname.startsWith('/assuntos'))              return 'Assuntos';
   if (pathname.startsWith('/hierarquia'))            return 'Hierarquia';
