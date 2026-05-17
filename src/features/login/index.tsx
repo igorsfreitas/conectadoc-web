@@ -1,10 +1,132 @@
-import { FormEvent, useContext, useEffect, useState } from "react";
+import { FormEvent, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AfinzApiError } from "@afinz/rest-client";
 import { useInject } from "../../infra/hooks/inject";
 import { ProfileContext } from "../../infra/contexts/profile";
 import { afinzAppPaths } from "../../infra/router/paths/afinz_app";
 
+// ── Math captcha ──────────────────────────────────────────────────────────────
+function randomInt(min: number, max: number) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateChallenge(): { a: number; b: number; answer: number } {
+  const a = randomInt(1, 9);
+  const b = randomInt(1, 9);
+  return { a, b, answer: a + b };
+}
+
+interface CaptchaProps {
+  onValidChange: (valid: boolean) => void;
+  resetKey: number;
+}
+
+function MathCaptcha({ onValidChange, resetKey }: CaptchaProps) {
+  const [challenge, setChallenge] = useState(generateChallenge);
+  const [value, setValue] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const drawChallenge = useCallback((a: number, b: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Background
+    ctx.fillStyle = "#f3f4f6";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Noise lines
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(randomInt(0, canvas.width), randomInt(0, canvas.height));
+      ctx.lineTo(randomInt(0, canvas.width), randomInt(0, canvas.height));
+      ctx.stroke();
+    }
+
+    // Text
+    ctx.font = "bold 22px 'JetBrains Mono', monospace";
+    ctx.fillStyle = "#1e40af";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Slight rotation per character for visual noise
+    const text = `${a}  +  ${b}  =  ?`;
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((Math.random() - 0.5) * 0.08);
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    const c = generateChallenge();
+    setChallenge(c);
+    setValue("");
+    onValidChange(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
+
+  useEffect(() => {
+    drawChallenge(challenge.a, challenge.b);
+  }, [challenge, drawChallenge]);
+
+  function handleRefresh() {
+    const c = generateChallenge();
+    setChallenge(c);
+    setValue("");
+    onValidChange(false);
+  }
+
+  function handleChange(v: string) {
+    const digits = v.replace(/\D/g, "").slice(0, 2);
+    setValue(digits);
+    onValidChange(digits !== "" && Number(digits) === challenge.answer);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2, #374151)" }}>
+        Verificação
+      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <canvas
+          ref={canvasRef}
+          width={180}
+          height={48}
+          style={{ borderRadius: 8, border: "1px solid var(--border, #e5e7eb)", flexShrink: 0 }}
+        />
+        <button
+          type="button"
+          onClick={handleRefresh}
+          title="Gerar novo desafio"
+          style={{
+            background: "none", border: "1px solid var(--border, #e5e7eb)",
+            borderRadius: 8, padding: "6px 10px", cursor: "pointer",
+            color: "var(--text-3, #6b7280)", fontSize: 18, lineHeight: 1,
+          }}
+        >
+          ↻
+        </button>
+        <input
+          className="input"
+          type="text"
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="?"
+          style={{ width: 60, textAlign: "center", fontFamily: "JetBrains Mono, monospace", fontSize: 18 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Login page ────────────────────────────────────────────────────────────────
 const GOVBR_ERROR_MESSAGES: Record<string, string> = {
   usuario_nao_cadastrado: "Seu CPF não está cadastrado. Solicite acesso ao administrador.",
   govbr_session_expired: "Sessão de login expirou. Tente novamente.",
@@ -25,6 +147,8 @@ export function Login() {
   const [senha, setSenha] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [captchaValid, setCaptchaValid] = useState(false);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   useEffect(() => {
     const errCode = searchParams.get("error");
@@ -38,26 +162,26 @@ export function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!captchaValid) {
+      setError("Resolva a verificação antes de continuar.");
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
       const result = await authService.login({ cpf, senha });
       if (result instanceof AfinzApiError) {
         setError(result.message ?? "CPF ou senha inválidos.");
+        setCaptchaReset(n => n + 1);
+        setCaptchaValid(false);
         return;
       }
-      // Hydrate profile context so ProtectedRoutes renders immediately
       const profileRes = await profileService.getProfile();
       if (!(profileRes instanceof Error)) setProfile(profileRes as typeof profileRes);
       navigate(afinzAppPaths.assuntos.asRoute, { replace: true });
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleGovbrLogin() {
-    const redirect = encodeURIComponent(afinzAppPaths.assuntos.asRoute ?? "/");
-    window.location.assign(`/v1/auth/govbr/login?redirect=${redirect}`);
   }
 
   return (
@@ -120,39 +244,17 @@ export function Login() {
             />
           </div>
 
+          <MathCaptcha onValidChange={setCaptchaValid} resetKey={captchaReset} />
+
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={loading}
+            disabled={loading || !captchaValid}
             style={{ marginTop: 4, height: 40, fontSize: 14, fontWeight: 600 }}
           >
             {loading ? "Entrando…" : "Entrar"}
           </button>
         </form>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-3, #9ca3af)", fontSize: 12, margin: "20px 0" }}>
-          <span style={{ flex: 1, height: 1, background: "var(--border, #e5e7eb)" }} />
-          ou
-          <span style={{ flex: 1, height: 1, background: "var(--border, #e5e7eb)" }} />
-        </div>
-
-        <button
-          type="button"
-          onClick={handleGovbrLogin}
-          disabled={loading}
-          style={{
-            background: "#1351b4", color: "white", border: "none",
-            padding: "10px 16px", borderRadius: 8, fontWeight: 600,
-            cursor: "pointer", fontSize: 13.5,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          Entrar com{" "}
-          <span style={{ background: "white", color: "#1351b4", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 700 }}>
-            gov.br
-          </span>
-        </button>
       </div>
 
       {/* Right panel */}

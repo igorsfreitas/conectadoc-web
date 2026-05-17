@@ -51,8 +51,8 @@ export class PinErrorInterceptors implements HttpErrorInterceptors {
           errorMessage = errorMessage || "Requisição inválida";
           break;
         case 401:
-          errorMessage = "Sessão expirada. Faça login novamente";
           if (window.location.pathname !== afinzAppPaths.login.path) {
+            errorMessage = "Sessão expirada. Faça login novamente";
             window.location.href = afinzAppPaths.login.path;
           }
           break;
