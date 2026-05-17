@@ -2,8 +2,11 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useNavigate, useParams } from 'react-router-dom';
 import { Autocomplete, AutocompleteOption } from '../../../infra/components/autocomplete';
 import { useInject } from '../../../infra/hooks/inject';
+import { DraftBanner, useFormDraft } from '../../../infra/hooks/use-form-draft';
 import { LogAcesso, PerfilSimple, SegmentoSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
+
+const DRAFT_KEY = 'form-draft:usuario-novo';
 
 type Tab = 'dados' | 'perfis' | 'foto' | 'assinatura' | 'logs';
 
@@ -54,8 +57,10 @@ function fromEntity(u: Usuario): FormState {
     rg: u.rg ?? '', orgaoExp: u.orgaoExp ?? '',
     dataNascimento: u.dataNascimento ? u.dataNascimento.slice(0, 10) : '',
     tipoSanguineo: u.tipoSanguineo !== null ? String(u.tipoSanguineo) : '',
-    segmento: u.segmento ?? null, segmentoLabel: '',
-    entidadeExterna: u.entidadeExterna ?? null, entidadeExternaLabel: '',
+    segmento: u.segmento ?? null,
+    segmentoLabel: u.segmentoNome ? `${u.segmentoSigla ? u.segmentoSigla + ' — ' : ''}${u.segmentoNome}` : '',
+    entidadeExterna: u.entidadeExterna ?? null,
+    entidadeExternaLabel: u.entidadeExternaNome ? `${u.entidadeExternaSigla ? u.entidadeExternaSigla + ' — ' : ''}${u.entidadeExternaNome}` : '',
     estagiario: !!u.flagEstagiario, dataInicio: u.dataInicio ? String(u.dataInicio).slice(0, 10) : '',
     dataFim: u.dataFim ? String(u.dataFim).slice(0, 10) : '',
     obs: u.obs ?? '', nomeAbreviado: u.nomeAbreviado ?? '',
@@ -112,6 +117,12 @@ export function UsuariosFormPage() {
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(p => ({ ...p, [k]: v }));
   }
+
+  // Draft persistence — only active for the "novo usuário" flow.
+  const draft = useFormDraft(DRAFT_KEY, form, {
+    enabled: !isEdit,
+    isEmpty: s => !s.nome.trim() && !s.cpf.trim(),
+  });
 
   const loadPerfisUsuario = useCallback(async (id: number) => {
     try {
@@ -353,6 +364,7 @@ export function UsuariosFormPage() {
         navigate(afinzAppPaths.usuarios.asRoute!);
       } else {
         await service.create(payload as UsuarioPayload);
+        draft.clearDraft();
         navigate(afinzAppPaths.usuarios.asRoute!);
       }
     } catch (e: any) {
@@ -424,6 +436,13 @@ export function UsuariosFormPage() {
       {/* ── Tab: Dados Pessoais ── */}
       {tab === 'dados' && (
         <form onSubmit={handleSubmit}>
+          {!isEdit && draft.hasDraft && draft.draftSavedAt && (
+            <DraftBanner
+              savedAt={draft.draftSavedAt}
+              onRestore={() => setForm(draft.restoreDraft() ?? empty())}
+              onDiscard={draft.dismissDraft}
+            />
+          )}
           <div className="card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
             {/* Linha 1: Login/CPF + Senha */}

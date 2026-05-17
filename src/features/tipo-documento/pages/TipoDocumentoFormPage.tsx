@@ -3,7 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { RichEditor, RichEditorHandle } from '../../../infra/components/rich-editor';
 import { useInject } from '../../../infra/hooks/inject';
+import { DraftBanner, useFormDraft } from '../../../infra/hooks/use-form-draft';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
+
+const DRAFT_KEY = 'form-draft:tipo-documento-novo';
 import {
   AtributoTipoDocumento,
   AtributoTipoPayload,
@@ -492,6 +495,12 @@ export function TipoDocumentoFormPage() {
     setForm(prev => ({ ...prev, [key]: value }));
   }
 
+  // Draft — only active when creating a new tipo de documento.
+  const draft = useFormDraft(DRAFT_KEY, form, {
+    enabled: isNew,
+    isEmpty: s => !s.nome.trim(),
+  });
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.nome.trim()) { setError('O campo Nome é obrigatório.'); return; }
@@ -504,6 +513,7 @@ export function TipoDocumentoFormPage() {
       const payload = formToPayload({ ...form, help: helpHtml, tela: telaHtml });
       if (isNew) {
         await service.create(payload);
+        draft.clearDraft();
       } else {
         await service.update(codigo!, payload);
       }
@@ -591,6 +601,14 @@ export function TipoDocumentoFormPage() {
         <div style={{ marginBottom: 16, padding: '10px 16px', background: 'var(--danger-50, #fef2f2)', border: '1px solid var(--danger-200, #fecaca)', borderRadius: 'var(--radius)', color: 'var(--danger-500)', fontSize: 13.5 }}>
           {error}
         </div>
+      )}
+
+      {isNew && draft.hasDraft && draft.draftSavedAt && (
+        <DraftBanner
+          savedAt={draft.draftSavedAt}
+          onRestore={() => setForm(draft.restoreDraft() ?? emptyForm())}
+          onDiscard={draft.dismissDraft}
+        />
       )}
 
       <form onSubmit={handleSubmit}>

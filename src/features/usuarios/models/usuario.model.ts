@@ -17,7 +17,11 @@ export interface Usuario {
   dataNascimento: string | null;
   tipoSanguineo: number | null;
   segmento: number | null;
+  segmentoNome?: string | null;
+  segmentoSigla?: string | null;
   entidadeExterna: number | null;
+  entidadeExternaNome?: string | null;
+  entidadeExternaSigla?: string | null;
   flagEstagiario: number | null;
   dataInicio: string | null;
   dataFim: string | null;

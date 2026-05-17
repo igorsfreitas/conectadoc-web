@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInject } from "../../../infra/hooks/inject";
+import { DraftBanner, useFormDraft } from "../../../infra/hooks/use-form-draft";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { TipoDocumentoSimples } from "../models/documento.model";
+
+const DRAFT_KEY = "form-draft:novo-documento";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Segmento { codigo: number; nome: string | null; sigla: string | null; }
@@ -129,6 +132,22 @@ export function NovoDocumentoPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formValues = { codigoTipo, codigoSegmento, codigoAssunto, resumo, despacho, confidencial };
+  const draft = useFormDraft(DRAFT_KEY, formValues, {
+    isEmpty: s => s.codigoTipo === null && !s.resumo.trim(),
+  });
+
+  function handleRestoreDraft() {
+    const saved = draft.restoreDraft();
+    if (!saved) return;
+    if (saved.codigoTipo !== undefined)    setCodigoTipo(saved.codigoTipo);
+    if (saved.codigoSegmento !== undefined) setCodigoSegmento(saved.codigoSegmento);
+    if (saved.codigoAssunto !== undefined)  setCodigoAssunto(saved.codigoAssunto);
+    if (saved.resumo !== undefined)         setResumo(saved.resumo);
+    if (saved.despacho !== undefined)       setDespacho(saved.despacho);
+    if (saved.confidencial !== undefined)   setConfidencial(saved.confidencial);
+  }
+
   useEffect(() => {
     docService.findTiposInterno().then(setTipos).catch(() => {});
     uaService.findAllSimple().then((data: Segmento[]) => setSegmentos(data)).catch(() => {});
@@ -154,6 +173,7 @@ export function NovoDocumentoPage() {
         despacho: despacho.trim() || undefined,
         flagConfidencial: confidencial ? 1 : 0,
       });
+      draft.clearDraft();
       navigate(afinzAppPaths.caixaEntrada.asRoute!);
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Erro ao criar documento.");
@@ -179,6 +199,15 @@ export function NovoDocumentoPage() {
           Preencha as informações do documento a ser criado
         </p>
       </div>
+
+      {/* Draft restore banner */}
+      {draft.hasDraft && draft.draftSavedAt && (
+        <DraftBanner
+          savedAt={draft.draftSavedAt}
+          onRestore={handleRestoreDraft}
+          onDiscard={draft.dismissDraft}
+        />
+      )}
 
       {/* Form card */}
       <div style={{
