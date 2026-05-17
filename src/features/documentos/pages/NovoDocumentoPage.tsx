@@ -1,46 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInject } from "../../../infra/hooks/inject";
-import { DraftBanner, useFormDraft } from "../../../infra/hooks/use-form-draft";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
+import { CreateDocumentoResponse } from "../models/documento.model";
 import { TipoDocumentoSimples } from "../models/documento.model";
-
-const DRAFT_KEY = "form-draft:novo-documento";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Segmento { codigo: number; nome: string | null; sigla: string | null; }
 interface Assunto  { codigo: number; descricao: string | null; }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── SearchSelect ──────────────────────────────────────────────────────────────
 function SearchSelect({
   label,
   placeholder,
   items,
   value,
   onSelect,
-  renderItem,
-  renderSelected,
   loading,
-  onSearch,
 }: {
   label: string;
   placeholder: string;
   items: { codigo: number | string; label: string }[];
   value: number | string | null;
   onSelect: (codigo: number | string) => void;
-  renderItem?: (item: { codigo: number | string; label: string }) => React.ReactNode;
-  renderSelected?: (item: { codigo: number | string; label: string }) => React.ReactNode;
   loading?: boolean;
-  onSearch?: (q: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const selected = items.find(i => i.codigo == value);
-
-  const filtered = q
-    ? items.filter(i => i.label.toLowerCase().includes(q.toLowerCase()))
-    : items;
+  const filtered = q ? items.filter(i => i.label.toLowerCase().includes(q.toLowerCase())) : items;
 
   useEffect(() => {
     function close(e: MouseEvent) {
@@ -64,7 +53,7 @@ function SearchSelect({
         }}
         onClick={() => setOpen(o => !o)}
       >
-        <span>{selected ? (renderSelected ? renderSelected(selected) : selected.label) : placeholder}</span>
+        <span>{selected ? selected.label : placeholder}</span>
         <span style={{ fontSize: 11, color: "var(--text-3)" }}>▾</span>
       </div>
 
@@ -80,7 +69,7 @@ function SearchSelect({
               autoFocus
               className="input"
               value={q}
-              onChange={e => { setQ(e.target.value); onSearch?.(e.target.value); }}
+              onChange={e => setQ(e.target.value)}
               placeholder="Buscar..."
               style={{ height: 32, fontSize: 13, width: "100%" }}
             />
@@ -102,7 +91,7 @@ function SearchSelect({
                 onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2, #f9fafb)")}
                 onMouseLeave={e => (e.currentTarget.style.background = item.codigo == value ? "oklch(0.965 0.008 250)" : "")}
               >
-                {renderItem ? renderItem(item) : item.label}
+                {item.label}
               </div>
             ))}
           </div>
@@ -112,41 +101,48 @@ function SearchSelect({
   );
 }
 
+// ── InfoField ─────────────────────────────────────────────────────────────────
+function InfoField({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3, #6b7280)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 13, color: "var(--text, #111)", fontFamily: value.match(/^\d/) ? "JetBrains Mono, monospace" : "inherit" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export function NovoDocumentoPage() {
   const navigate = useNavigate();
-  const docService = useInject("DocumentosService");
+  const docService  = useInject("DocumentosService");
   const assuntosService = useInject("AssuntosService");
-  const uaService = useInject("UnidadeAdministrativaService");
+  const uaService   = useInject("UnidadeAdministrativaService");
 
+  // ── Step 1 state ──────────────────────────────────────────────────────────
+  const [step, setStep] = useState<1 | 2>(1);
   const [tipos, setTipos] = useState<TipoDocumentoSimples[]>([]);
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
-  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
-
   const [codigoTipo, setCodigoTipo] = useState<number | null>(null);
-  const [codigoSegmento, setCodigoSegmento] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [step1Error, setStep1Error] = useState<string | null>(null);
+
+  // ── Step 2 state ──────────────────────────────────────────────────────────
+  const [createdDoc, setCreatedDoc] = useState<CreateDocumentoResponse | null>(null);
+  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
   const [codigoAssunto, setCodigoAssunto] = useState<number | null>(null);
+  const [codigoSegmentoCriador, setCodigoSegmentoCriador] = useState<number | null>(null);
   const [resumo, setResumo] = useState("");
-  const [despacho, setDespacho] = useState("");
-  const [confidencial, setConfidencial] = useState(false);
+  const [flagExpedienteImpresso, setFlagExpedienteImpresso] = useState<0 | 1>(0);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [step2Error, setStep2Error] = useState<string | null>(null);
 
-  const formValues = { codigoTipo, codigoSegmento, codigoAssunto, resumo, despacho, confidencial };
-  const draft = useFormDraft(DRAFT_KEY, formValues, {
-    isEmpty: s => s.codigoTipo === null && !s.resumo.trim(),
-  });
-
-  function handleRestoreDraft() {
-    const saved = draft.restoreDraft();
-    if (!saved) return;
-    if (saved.codigoTipo !== undefined)    setCodigoTipo(saved.codigoTipo);
-    if (saved.codigoSegmento !== undefined) setCodigoSegmento(saved.codigoSegmento);
-    if (saved.codigoAssunto !== undefined)  setCodigoAssunto(saved.codigoAssunto);
-    if (saved.resumo !== undefined)         setResumo(saved.resumo);
-    if (saved.despacho !== undefined)       setDespacho(saved.despacho);
-    if (saved.confidencial !== undefined)   setConfidencial(saved.confidencial);
-  }
+  const tipoItems = tipos.map(t => ({ codigo: t.codigo, label: `${t.sigla ? t.sigla + " — " : ""}${t.nome ?? String(t.codigo)}` }));
+  const segItems  = segmentos.map(s => ({ codigo: s.codigo, label: `${s.sigla ?? ""} — ${s.nome ?? ""}` }));
+  const assItems  = assuntos.map(a => ({ codigo: a.codigo, label: a.descricao ?? String(a.codigo) }));
 
   useEffect(() => {
     docService.findTiposInterno().then(setTipos).catch(() => {});
@@ -154,33 +150,50 @@ export function NovoDocumentoPage() {
     assuntosService.findAll(1, 200).then((r: { data: Assunto[] }) => setAssuntos(r.data)).catch(() => {});
   }, []);
 
-  const tipoItems = tipos.map(t => ({ codigo: t.codigo, label: t.nome ?? t.sigla ?? String(t.codigo) }));
-  const segItems  = segmentos.map(s => ({ codigo: s.codigo, label: `${s.sigla ?? ""} — ${s.nome ?? ""}` }));
-  const assItems  = assuntos.map(a => ({ codigo: a.codigo, label: a.descricao ?? String(a.codigo) }));
-
-  const canSubmit = codigoTipo !== null && resumo.trim().length > 0 && !saving;
-
-  async function handleSubmit() {
-    if (!canSubmit || codigoTipo === null) return;
-    setSaving(true);
-    setError(null);
+  // ── Step 1: Confirmar (cria o documento) ──────────────────────────────────
+  async function handleConfirmar() {
+    if (!codigoTipo || confirming) return;
+    setConfirming(true);
+    setStep1Error(null);
     try {
-      await docService.criar({
-        codigoTipoDocumento: codigoTipo,
+      const doc = await docService.criar({ codigoTipoDocumento: codigoTipo });
+      setCreatedDoc(doc);
+      setStep(2);
+    } catch (e: any) {
+      setStep1Error(e?.response?.data?.message ?? "Erro ao criar documento.");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  // ── Step 2: Salvar (complementa o documento) ──────────────────────────────
+  async function handleSalvar() {
+    if (!createdDoc || saving) return;
+    setSaving(true);
+    setStep2Error(null);
+    try {
+      await docService.atualizar(createdDoc.codigo, {
+        resumo: resumo.trim() || undefined,
         codigoAssunto: codigoAssunto ?? undefined,
-        codigoSegmentoDestino: codigoSegmento ?? undefined,
-        resumo: resumo.trim(),
-        despacho: despacho.trim() || undefined,
-        flagConfidencial: confidencial ? 1 : 0,
+        flagExpedienteImpresso,
+        codigoSegmentoCriador: codigoSegmentoCriador ?? undefined,
       });
-      draft.clearDraft();
       navigate(afinzAppPaths.caixaEntrada.asRoute!);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Erro ao criar documento.");
+      setStep2Error(e?.response?.data?.message ?? "Erro ao salvar documento.");
       setSaving(false);
     }
   }
 
+  // ── Formatters ────────────────────────────────────────────────────────────
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       {/* Header */}
@@ -196,146 +209,190 @@ export function NovoDocumentoPage() {
           Novo Documento
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-3, #6b7280)", margin: "4px 0 0" }}>
-          Preencha as informações do documento a ser criado
+          {step === 1 ? "Selecione o tipo de documento para iniciar" : "Complementar informações do documento"}
         </p>
       </div>
 
-      {/* Draft restore banner */}
-      {draft.hasDraft && draft.draftSavedAt && (
-        <DraftBanner
-          savedAt={draft.draftSavedAt}
-          onRestore={handleRestoreDraft}
-          onDiscard={draft.dismissDraft}
-        />
+      {/* Step indicator */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+        {([1, 2] as const).map(s => (
+          <div key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%", display: "flex",
+              alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700,
+              background: step >= s ? "var(--brand-600, #2563eb)" : "var(--surface-2, #f3f4f6)",
+              color: step >= s ? "#fff" : "var(--text-3, #9ca3af)",
+            }}>{s}</div>
+            <span style={{ fontSize: 13, color: step === s ? "var(--text, #111)" : "var(--text-3, #9ca3af)", fontWeight: step === s ? 600 : 400 }}>
+              {s === 1 ? "Tipo" : "Complementar"}
+            </span>
+            {s < 2 && <span style={{ fontSize: 13, color: "var(--text-3)" }}>→</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* ── STEP 1 ─────────────────────────────────────────────────────────── */}
+      {step === 1 && (
+        <div style={{ background: "#fff", border: "1px solid var(--border, #e5e7eb)", borderRadius: 12, padding: "28px 32px" }}>
+          <div style={{ position: "relative" }}>
+            <SearchSelect
+              label="Tipo de Documento *"
+              placeholder="Selecione o tipo..."
+              items={tipoItems}
+              value={codigoTipo}
+              onSelect={v => setCodigoTipo(Number(v))}
+            />
+          </div>
+
+          {step1Error && (
+            <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 13, color: "#dc2626" }}>
+              {step1Error}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button className="btn btn-secondary" onClick={() => navigate(-1)} disabled={confirming}>
+              Cancelar
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleConfirmar}
+              disabled={!codigoTipo || confirming}
+              style={{ minWidth: 140 }}
+            >
+              {confirming ? "Criando…" : "Confirmar"}
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Form card */}
-      <div style={{
-        background: "#fff", border: "1px solid var(--border, #e5e7eb)",
-        borderRadius: 12, padding: "28px 32px",
-      }}>
-        {/* Tipo */}
-        <div style={{ position: "relative" }}>
-          <SearchSelect
-            label="Tipo de Documento *"
-            placeholder="Selecione o tipo..."
-            items={tipoItems}
-            value={codigoTipo}
-            onSelect={v => setCodigoTipo(Number(v))}
-          />
-        </div>
-
-        {/* Para (destino) */}
-        <div style={{ position: "relative" }}>
-          <SearchSelect
-            label="Para (destino)"
-            placeholder="Selecione a unidade de destino..."
-            items={segItems}
-            value={codigoSegmento}
-            onSelect={v => setCodigoSegmento(Number(v))}
-          />
-        </div>
-
-        {/* Assunto */}
-        <div style={{ position: "relative" }}>
-          <SearchSelect
-            label="Assunto"
-            placeholder="Selecione o assunto..."
-            items={assItems}
-            value={codigoAssunto}
-            onSelect={v => setCodigoAssunto(Number(v))}
-          />
-        </div>
-
-        {/* Resumo / Texto */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-2, #374151)", marginBottom: 4 }}>
-            Texto / Resumo *
-          </label>
-          <textarea
-            value={resumo}
-            onChange={e => setResumo(e.target.value)}
-            placeholder="Descreva o conteúdo do documento..."
-            rows={6}
-            style={{
-              width: "100%", boxSizing: "border-box", resize: "vertical",
-              border: "1px solid var(--border, #e5e7eb)", borderRadius: 8,
-              padding: "8px 12px", fontSize: 13, fontFamily: "inherit",
-              lineHeight: 1.6, outline: "none", color: "var(--text, #111)",
-            }}
-            onFocus={e => (e.target.style.borderColor = "var(--brand-600, #2563eb)")}
-            onBlur={e => (e.target.style.borderColor = "var(--border, #e5e7eb)")}
-          />
-          <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "right", marginTop: 2 }}>
-            {resumo.length} / 2000
-          </div>
-        </div>
-
-        {/* Despacho */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-2, #374151)", marginBottom: 4 }}>
-            Despacho / Observação
-          </label>
-          <textarea
-            value={despacho}
-            onChange={e => setDespacho(e.target.value)}
-            placeholder="Instrução ou observação de envio (opcional)..."
-            rows={3}
-            style={{
-              width: "100%", boxSizing: "border-box", resize: "vertical",
-              border: "1px solid var(--border, #e5e7eb)", borderRadius: 8,
-              padding: "8px 12px", fontSize: 13, fontFamily: "inherit",
-              lineHeight: 1.6, outline: "none", color: "var(--text, #111)",
-            }}
-            onFocus={e => (e.target.style.borderColor = "var(--brand-600, #2563eb)")}
-            onBlur={e => (e.target.style.borderColor = "var(--border, #e5e7eb)")}
-          />
-        </div>
-
-        {/* Confidencial */}
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            id="confidencial"
-            type="checkbox"
-            checked={confidencial}
-            onChange={e => setConfidencial(e.target.checked)}
-            style={{ cursor: "pointer", width: 15, height: 15 }}
-          />
-          <label htmlFor="confidencial" style={{ fontSize: 13, color: "var(--text-2, #374151)", cursor: "pointer" }}>
-            🔒 Documento confidencial
-          </label>
-        </div>
-
-        {/* Error */}
-        {error && (
+      {/* ── STEP 2 ─────────────────────────────────────────────────────────── */}
+      {step === 2 && createdDoc && (
+        <>
+          {/* Read-only header card */}
           <div style={{
-            marginBottom: 16, padding: "10px 14px", borderRadius: 8,
-            background: "#fef2f2", border: "1px solid #fecaca",
-            fontSize: 13, color: "#dc2626",
+            background: "oklch(0.97 0.008 250)",
+            border: "1px solid oklch(0.88 0.02 250)",
+            borderRadius: 12, padding: "18px 24px", marginBottom: 16,
           }}>
-            {error}
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--brand-600, #2563eb)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
+              Documento criado
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "14px 24px" }}>
+              <InfoField label="NETDOC" value={createdDoc.numeroNetdoc} />
+              {createdDoc.numero && <InfoField label="Número" value={createdDoc.numero} />}
+              <InfoField label="Data de Criação" value={formatDate(createdDoc.dataHoraCriacao)} />
+              <InfoField
+                label="Tipo"
+                value={[createdDoc.tipoDocumentoSigla, createdDoc.tipoDocumentoNome].filter(Boolean).join(" — ") || "—"}
+              />
+              <InfoField
+                label="Unidade Origem"
+                value={[createdDoc.segmentoOrigemSigla, createdDoc.segmentoOrigemNome].filter(Boolean).join(" — ") || "—"}
+              />
+            </div>
           </div>
-        )}
 
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => navigate(-1)}
-            disabled={saving}
-          >
-            Cancelar
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            style={{ minWidth: 140 }}
-          >
-            {saving ? "Criando…" : "Criar Documento"}
-          </button>
-        </div>
-      </div>
+          {/* Editable fields card */}
+          <div style={{ background: "#fff", border: "1px solid var(--border, #e5e7eb)", borderRadius: 12, padding: "28px 32px" }}>
+
+            {/* Unidade Cadastrante */}
+            <div style={{ position: "relative" }}>
+              <SearchSelect
+                label="Unidade Cadastrante"
+                placeholder="Selecione a unidade cadastrante..."
+                items={segItems}
+                value={codigoSegmentoCriador}
+                onSelect={v => setCodigoSegmentoCriador(Number(v))}
+              />
+            </div>
+
+            {/* Assunto */}
+            <div style={{ position: "relative" }}>
+              <SearchSelect
+                label="Assunto"
+                placeholder="Selecione o assunto..."
+                items={assItems}
+                value={codigoAssunto}
+                onSelect={v => setCodigoAssunto(Number(v))}
+              />
+            </div>
+
+            {/* Resumo */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-2, #374151)", marginBottom: 4 }}>
+                Texto / Resumo
+              </label>
+              <textarea
+                value={resumo}
+                onChange={e => setResumo(e.target.value)}
+                placeholder="Descreva o conteúdo do documento..."
+                rows={5}
+                style={{
+                  width: "100%", boxSizing: "border-box", resize: "vertical",
+                  border: "1px solid var(--border, #e5e7eb)", borderRadius: 8,
+                  padding: "8px 12px", fontSize: 13, fontFamily: "inherit",
+                  lineHeight: 1.6, outline: "none", color: "var(--text, #111)",
+                }}
+                onFocus={e => (e.target.style.borderColor = "var(--brand-600, #2563eb)")}
+                onBlur={e => (e.target.style.borderColor = "var(--border, #e5e7eb)")}
+              />
+              <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "right", marginTop: 2 }}>
+                {resumo.length} / 2000
+              </div>
+            </div>
+
+            {/* Físico / Digital */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 500, color: "var(--text-2, #374151)", marginBottom: 8 }}>
+                Suporte
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {([0, 1] as const).map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setFlagExpedienteImpresso(val)}
+                    style={{
+                      padding: "6px 18px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                      cursor: "pointer", border: "1px solid",
+                      borderColor: flagExpedienteImpresso === val ? "var(--brand-600, #2563eb)" : "var(--border, #e5e7eb)",
+                      background: flagExpedienteImpresso === val ? "oklch(0.965 0.008 250)" : "#fff",
+                      color: flagExpedienteImpresso === val ? "var(--brand-600, #2563eb)" : "var(--text-2, #374151)",
+                    }}
+                  >
+                    {val === 0 ? "Digital" : "Físico"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {step2Error && (
+              <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 13, color: "#dc2626" }}>
+                {step2Error}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => navigate(afinzAppPaths.caixaEntrada.asRoute!)}
+                disabled={saving}
+              >
+                Ir para Caixa
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSalvar}
+                disabled={saving}
+                style={{ minWidth: 140 }}
+              >
+                {saving ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

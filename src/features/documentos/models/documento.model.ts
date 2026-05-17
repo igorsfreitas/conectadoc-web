@@ -10,7 +10,7 @@ export interface CreateDocumentoPayload {
   codigoTipoDocumento: number;
   codigoAssunto?: number;
   codigoSegmentoDestino?: number;
-  resumo: string;
+  resumo?: string;
   despacho?: string;
   flagConfidencial?: number;
 }
@@ -18,7 +18,21 @@ export interface CreateDocumentoPayload {
 export interface CreateDocumentoResponse {
   codigo: number;
   numeroNetdoc: string;
+  numero: string | null;
   codigoTramitacao: number | null;
+  dataHoraCriacao: string;
+  tipoDocumentoNome: string | null;
+  tipoDocumentoSigla: string | null;
+  segmentoOrigemNome: string | null;
+  segmentoOrigemSigla: string | null;
+}
+
+export interface UpdateDocumentoPayload {
+  resumo?: string;
+  codigoAssunto?: number;
+  codigoEstado?: number;
+  flagExpedienteImpresso?: number;
+  codigoSegmentoCriador?: number;
 }
 
 export interface CaixaItem {

@@ -5,6 +5,7 @@ import {
   CreateDocumentoPayload,
   CreateDocumentoResponse,
   TipoDocumentoSimples,
+  UpdateDocumentoPayload,
 } from '../../../features/documentos/models/documento.model';
 
 export class DocumentosService {
@@ -36,5 +37,9 @@ export class DocumentosService {
   async criar(payload: CreateDocumentoPayload): Promise<CreateDocumentoResponse> {
     const res = await this.httpClient.post<CreateDocumentoResponse>('/v1/documentos', payload);
     return res.data;
+  }
+
+  async atualizar(id: number, payload: UpdateDocumentoPayload): Promise<void> {
+    await this.httpClient.patch(`/v1/documentos/${id}`, payload);
   }
 }
