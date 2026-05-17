@@ -15,6 +15,8 @@ import { CasoUsoPage } from "../../features/caso-uso/pages/caso_uso_page";
 import { PerfisPage } from "../../features/perfis/pages/perfis_page";
 import { UsuariosListPage } from "../../features/usuarios/pages/UsuariosListPage";
 import { UsuariosFormPage } from "../../features/usuarios/pages/UsuariosFormPage";
+import { InicioPage } from "../../features/inicio/pages/InicioPage";
+import { ConfiguracaoPage } from "../../features/configuracao/pages/ConfiguracaoPage";
 import { AppLayout } from "../template/app/index";
 import { ProfileManager, ProfileContext } from "../contexts/profile";
 import { afinzAppPaths } from "./paths/afinz_app";
@@ -52,6 +54,8 @@ function ProtectedRoutes() {
         <Route path={afinzAppPaths.usuarios.asRoute} element={<UsuariosListPage />} />
         <Route path={`${afinzAppPaths.usuarios.asRoute}/novo`} element={<UsuariosFormPage />} />
         <Route path={`${afinzAppPaths.usuarios.asRoute}/:codigo`} element={<UsuariosFormPage />} />
+        <Route path={afinzAppPaths.inicio.asRoute} element={<InicioPage />} />
+        <Route path={afinzAppPaths.configuracao.asRoute} element={<ConfiguracaoPage />} />
       </Route>
       <Route path="*" element={<ServerInstabilityPage />} />
     </Routes>
@@ -63,7 +67,7 @@ export function Router() {
     <BrowserRouter>
       <ProfileManager>
         <Routes>
-          <Route path="/" element={<Navigate to={afinzAppPaths.assuntos.asRoute} replace />} />
+          <Route path="/" element={<Navigate to={afinzAppPaths.inicio.asRoute} replace />} />
           <Route path={afinzAppPaths.login.path} element={<Login />} />
           <Route path="/*" element={<ProtectedRoutes />} />
         </Routes>

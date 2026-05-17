@@ -66,4 +66,44 @@ export const afinzAppPaths = {
     path: "/documentos/novo",
     asRoute: "/documentos/novo",
   },
+  inicio: {
+    name: 'Início',
+    path: '/inicio',
+    asRoute: '/inicio',
+  },
+  documentos: {
+    name: 'Documentos',
+    path: '/documentos',
+    asRoute: '/documentos',
+  },
+  assinaturas: {
+    name: 'Assinaturas',
+    path: '/assinaturas',
+    asRoute: '/assinaturas',
+  },
+  pesquisaAvancada: {
+    name: 'Pesquisa Avançada',
+    path: '/pesquisa-avancada',
+    asRoute: '/pesquisa-avancada',
+  },
+  cracha: {
+    name: 'Crachá',
+    path: '/cracha',
+    asRoute: '/cracha',
+  },
+  administracao: {
+    name: 'Administração',
+    path: '/administracao',
+    asRoute: '/administracao',
+  },
+  configuracao: {
+    name: 'Configuração',
+    path: '/configuracao',
+    asRoute: '/configuracao',
+  },
+  relatoriosIndicadores: {
+    name: 'Relatórios & Indicadores',
+    path: '/relatorios',
+    asRoute: '/relatorios',
+  },
 };
