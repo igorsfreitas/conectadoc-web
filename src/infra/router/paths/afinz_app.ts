@@ -56,4 +56,9 @@ export const afinzAppPaths = {
     path: "/usuarios",
     asRoute: "/usuarios",
   },
+  caixaEntrada: {
+    name: "Caixa de Entrada",
+    path: "/caixa",
+    asRoute: "/caixa",
+  },
 };
