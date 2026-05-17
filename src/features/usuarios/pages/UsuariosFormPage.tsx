@@ -2,7 +2,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useNavigate, useParams } from 'react-router-dom';
 import { Autocomplete, AutocompleteOption } from '../../../infra/components/autocomplete';
 import { useInject } from '../../../infra/hooks/inject';
-import { LogAcesso, PerfilSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
+import { LogAcesso, PerfilSimple, SegmentoSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
 
 type Tab = 'dados' | 'perfis' | 'foto' | 'assinatura' | 'logs';
@@ -85,6 +85,12 @@ export function UsuariosFormPage() {
   const [selectedPerfil, setSelectedPerfil] = useState('');
   const [perfilSaving, setPerfilSaving]   = useState(false);
 
+  // Unidades Administrativas (segmentos)
+  const [segmentosUsuario, setSegmentosUsuario] = useState<SegmentoSimple[]>([]);
+  const [segmentoSaving, setSegmentoSaving]     = useState(false);
+  const [segmentoAdd, setSegmentoAdd]           = useState<number | null>(null);
+  const [segmentoAddLabel, setSegmentoAddLabel] = useState('');
+
   // Foto
   const [fotoUrl, setFotoUrl]           = useState<string | null>(null);
   const [fotoUploading, setFotoUploading] = useState(false);
@@ -114,6 +120,13 @@ export function UsuariosFormPage() {
     } catch { /* silencioso */ }
   }, [service]);
 
+  const loadSegmentosUsuario = useCallback(async (id: number) => {
+    try {
+      const list = await service.findSegmentos(id);
+      setSegmentosUsuario(list as SegmentoSimple[]);
+    } catch { /* silencioso */ }
+  }, [service]);
+
   // Carregar dados do usuário em modo edição
   useEffect(() => {
     if (!isEdit) return;
@@ -127,14 +140,21 @@ export function UsuariosFormPage() {
       .catch(() => setError('Não foi possível carregar o usuário.'))
       .finally(() => setLoading(false));
     loadPerfisUsuario(Number(codigo));
-  }, [codigo, isEdit, service, loadPerfisUsuario]);
+    loadSegmentosUsuario(Number(codigo));
+  }, [codigo, isEdit, service, loadPerfisUsuario, loadSegmentosUsuario]);
+
+  const [perfisLoading, setPerfisLoading] = useState(false);
+  const [perfisLoadError, setPerfisLoadError] = useState(false);
 
   // Carregar todos os perfis para o select
   useEffect(() => {
     if (!isEdit) return;
-    perfisService.findAll(1, 200, {})
+    setPerfisLoading(true);
+    setPerfisLoadError(false);
+    perfisService.findAll(1, 100, {})
       .then(r => setTodosPerfis(r.data as PerfilSimple[]))
-      .catch(() => {});
+      .catch(() => setPerfisLoadError(true))
+      .finally(() => setPerfisLoading(false));
   }, [isEdit, perfisService]);
 
   // Carregar logs de acesso ao abrir a aba
@@ -270,6 +290,29 @@ export function UsuariosFormPage() {
         setError(err?.response?.data?.message ?? 'Erro ao salvar assinatura.');
       } finally { setAssinaturaUploading(false); }
     }, 'image/png');
+  }
+
+  async function handleAddSegmento() {
+    if (segmentoAdd === null || !isEdit) return;
+    setSegmentoSaving(true);
+    try {
+      await service.addSegmento(Number(codigo), segmentoAdd);
+      await loadSegmentosUsuario(Number(codigo));
+      setSegmentoAdd(null);
+      setSegmentoAddLabel('');
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Erro ao adicionar unidade administrativa.');
+    } finally { setSegmentoSaving(false); }
+  }
+
+  async function handleRemoveSegmento(segmentoId: number) {
+    if (!isEdit) return;
+    setSegmentoSaving(true);
+    try {
+      await service.removeSegmento(Number(codigo), segmentoId);
+      await loadSegmentosUsuario(Number(codigo));
+    } catch { setError('Erro ao remover unidade administrativa.'); }
+    finally { setSegmentoSaving(false); }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -765,13 +808,38 @@ export function UsuariosFormPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Adicionar */}
-              {availablePerfis.length > 0 && (
+              {perfisLoadError ? (
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: '#fef2f2', color: 'var(--danger-500)', fontSize: 13, border: '1px solid #fecaca' }}>
+                  Não foi possível carregar a lista de perfis. Verifique a conexão e recarregue a página.
+                </div>
+              ) : todosPerfis.length === 0 && !perfisLoading ? (
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text-3)', fontSize: 13, border: '1px solid var(--border)' }}>
+                  Nenhum perfil cadastrado no sistema. Crie perfis antes de vinculá-los ao usuário.
+                </div>
+              ) : (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <select className="input" value={selectedPerfil} onChange={e => setSelectedPerfil(e.target.value)} style={{ flex: 1 }}>
-                    <option value="">Selecione um perfil…</option>
-                    {availablePerfis.map(p => <option key={p.codigo} value={p.codigo}>{p.nome}</option>)}
+                  <select
+                    className="input"
+                    value={selectedPerfil}
+                    onChange={e => setSelectedPerfil(e.target.value)}
+                    style={{ flex: 1 }}
+                    disabled={perfisLoading || availablePerfis.length === 0}
+                  >
+                    {perfisLoading
+                      ? <option>Carregando perfis…</option>
+                      : availablePerfis.length === 0
+                        ? <option>Todos os perfis já foram atribuídos</option>
+                        : <>
+                            <option value="">Selecione um perfil para adicionar…</option>
+                            {availablePerfis.map(p => <option key={p.codigo} value={p.codigo}>{p.nome}</option>)}
+                          </>
+                    }
                   </select>
-                  <button className="btn btn-primary btn-sm" disabled={perfilSaving || !selectedPerfil} onClick={handleAddPerfil}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={perfilSaving || perfisLoading || !selectedPerfil}
+                    onClick={handleAddPerfil}
+                  >
                     <IconPlus /> Adicionar
                   </button>
                 </div>
@@ -797,6 +865,55 @@ export function UsuariosFormPage() {
                   </tbody>
                 </table>
               )}
+
+              {/* ── Unidades Administrativas ── */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginTop: 4 }}>
+                <h4 style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Unidades Administrativas</h4>
+
+                {/* Autocomplete para adicionar */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <Autocomplete
+                      key={`seg-add-${codigo}`}
+                      value={segmentoAdd}
+                      initialLabel={segmentoAddLabel}
+                      onChange={(val, label) => { setSegmentoAdd(val); setSegmentoAddLabel(label); }}
+                      fetchOptions={fetchSegmentos}
+                      placeholder="Buscar unidade administrativa para adicionar…"
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={segmentoSaving || segmentoAdd === null}
+                    onClick={handleAddSegmento}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    <IconPlus /> Adicionar
+                  </button>
+                </div>
+
+                {/* Lista de unidades vinculadas */}
+                {segmentosUsuario.length === 0 ? (
+                  <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>Nenhuma unidade administrativa vinculada.</p>
+                ) : (
+                  <table className="data">
+                    <thead><tr><th>Sigla</th><th>Unidade Administrativa</th><th style={{ width: 44 }}></th></tr></thead>
+                    <tbody>
+                      {segmentosUsuario.map(s => (
+                        <tr key={s.codigo}>
+                          <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12.5, whiteSpace: 'nowrap' }}>{s.sigla ?? '—'}</td>
+                          <td style={{ fontWeight: 500 }}>{s.nome ?? '—'}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button className="icon-btn" title="Remover" disabled={segmentoSaving} onClick={() => handleRemoveSegmento(s.codigo)} style={{ color: 'var(--danger-500)' }}>
+                              <IconTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           )}
         </div>

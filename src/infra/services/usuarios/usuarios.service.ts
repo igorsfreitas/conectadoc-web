@@ -1,5 +1,5 @@
 import { HttpClient } from '@afinz/rest-client';
-import { Usuario, UsuarioFilter, UsuarioPayload, PerfilSimple, LogAcesso } from '../../../features/usuarios/models/usuario.model';
+import { Usuario, UsuarioFilter, UsuarioPayload, PerfilSimple, LogAcesso, SegmentoSimple } from '../../../features/usuarios/models/usuario.model';
 import { Paginated } from '../../types/paginated';
 
 export class UsuariosService {
@@ -98,5 +98,18 @@ export class UsuariosService {
   async findLogsAcesso(id: number): Promise<LogAcesso[]> {
     const res = await this.httpClient.get<LogAcesso[]>(`/v1/usuarios/${id}/logs-acesso`);
     return res.data;
+  }
+
+  async findSegmentos(id: number): Promise<SegmentoSimple[]> {
+    const res = await this.httpClient.get<SegmentoSimple[]>(`/v1/usuarios/${id}/segmentos`);
+    return res.data;
+  }
+
+  async addSegmento(id: number, segmentoId: number): Promise<void> {
+    await this.httpClient.post(`/v1/usuarios/${id}/segmentos/${segmentoId}`);
+  }
+
+  async removeSegmento(id: number, segmentoId: number): Promise<void> {
+    await this.httpClient.delete(`/v1/usuarios/${id}/segmentos/${segmentoId}`);
   }
 }
