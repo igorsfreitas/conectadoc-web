@@ -10,6 +10,14 @@ export class UsuariosService {
     return res.data;
   }
 
+  async findAllExport(filter: UsuarioFilter = {}): Promise<Usuario[]> {
+    const first = await this.findAll(1, 1, filter);
+    const total = first.meta.total;
+    if (total === 0) return [];
+    const res = await this.httpClient.get<Paginated<Usuario>>('/v1/usuarios', { params: { page: 1, limit: total, ...filter } });
+    return res.data.data;
+  }
+
   async findOne(id: number): Promise<Usuario> {
     const res = await this.httpClient.get<Usuario>(`/v1/usuarios/${id}`);
     return res.data;
@@ -40,5 +48,33 @@ export class UsuariosService {
 
   async removePerfil(id: number, perfilId: number): Promise<void> {
     await this.httpClient.delete(`/v1/usuarios/${id}/perfis/${perfilId}`);
+  }
+
+  async uploadFoto(id: number, file: File): Promise<{ fotoUrl: string; fotoUrlSigned: string }> {
+    const form = new FormData();
+    form.append('foto', file);
+    const res = await this.httpClient.post<{ fotoUrl: string; fotoUrlSigned: string }>(
+      `/v1/usuarios/${id}/foto`,
+      form,
+    );
+    return res.data;
+  }
+
+  async removeFoto(id: number): Promise<void> {
+    await this.httpClient.delete(`/v1/usuarios/${id}/foto`);
+  }
+
+  async uploadAssinatura(id: number, file: File): Promise<{ assinaturaUrl: string; assinaturaUrlSigned: string }> {
+    const form = new FormData();
+    form.append('assinatura', file);
+    const res = await this.httpClient.post<{ assinaturaUrl: string; assinaturaUrlSigned: string }>(
+      `/v1/usuarios/${id}/assinatura`,
+      form,
+    );
+    return res.data;
+  }
+
+  async removeAssinatura(id: number): Promise<void> {
+    await this.httpClient.delete(`/v1/usuarios/${id}/assinatura`);
   }
 }

@@ -10,7 +10,7 @@ import { afinzAppPaths } from "../../infra/router/paths/afinz_app";
  */
 const GOVBR_ERROR_MESSAGES: Record<string, string> = {
   usuario_nao_cadastrado:
-    "Seu CPF não está cadastrado neste órgão. Solicite acesso ao administrador.",
+    "Seu CPF não está cadastrado. Solicite acesso ao administrador.",
   govbr_session_expired:
     "Sessão de login expirou. Tente novamente.",
   govbr_state_mismatch:
@@ -18,19 +18,7 @@ const GOVBR_ERROR_MESSAGES: Record<string, string> = {
   govbr_no_cpf: "O gov.br não retornou seu CPF. Verifique seu cadastro.",
   govbr_init_failed: "Não foi possível iniciar o login gov.br.",
   govbr_callback_failed: "Falha ao processar retorno do gov.br.",
-  tenant_indefinido:
-    "Tenant não identificado. Acesse pelo subdomínio do seu órgão.",
 };
-
-function resolveTenantForDirectNav(): string {
-  const hostname = window.location.hostname;
-  const parts = hostname.split(".");
-  if (parts.length >= 3) return parts[0].toLowerCase();
-  const envTenant = (import.meta as { env?: Record<string, string> }).env?.[
-    "VITE_APP_TENANT"
-  ];
-  return (envTenant ?? "amtt").trim();
-}
 
 export function Login() {
   const authService = useInject("AuthService");
@@ -71,12 +59,8 @@ export function Login() {
   }
 
   function handleGovbrLogin() {
-    // Navegação direta — não passa pelo axios. Em prod o tenant vem do
-    // subdomínio; em dev local mandamos via query string.
-    const tenant = resolveTenantForDirectNav();
     const redirect = encodeURIComponent(afinzAppPaths.assuntos.asRoute ?? "/");
-    const url = `/v1/auth/govbr/login?redirect=${redirect}&tenant=${tenant}`;
-    window.location.assign(url);
+    window.location.assign(`/v1/auth/govbr/login?redirect=${redirect}`);
   }
 
   return (

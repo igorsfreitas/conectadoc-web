@@ -7,5 +7,4 @@ export interface ProfileResponse {
   };
   isAdmin: boolean;
   permissions: string[];
-  tenant: string;
 }

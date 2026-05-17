@@ -36,7 +36,7 @@ export function Autocomplete({ value, onChange, fetchOptions, placeholder = 'Dig
         setOptions(res);
         setOpen(true);
       } finally { setLoading(false); }
-    }, 300);
+    }, 2000);
   }
 
   function select(opt: AutocompleteOption) {

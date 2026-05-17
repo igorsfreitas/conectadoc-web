@@ -1,11 +1,11 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Autocomplete, AutocompleteOption } from '../../../infra/components/autocomplete';
 import { useInject } from '../../../infra/hooks/inject';
 import { PerfilSimple, TIPO_SANGUINEO, Usuario, UsuarioPayload } from '../models/usuario.model';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
 
-type Tab = 'dados' | 'perfis';
+type Tab = 'dados' | 'perfis' | 'foto' | 'assinatura';
 
 function IconArrowLeft({ size = 16 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="19 12 5 12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -15,6 +15,12 @@ function IconTrash({ size = 13 }: { size?: number }) {
 }
 function IconPlus({ size = 13 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+}
+function IconUpload({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+}
+function IconPencil({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 }
 
 interface FormState {
@@ -79,6 +85,20 @@ export function UsuariosFormPage() {
   const [selectedPerfil, setSelectedPerfil] = useState('');
   const [perfilSaving, setPerfilSaving]   = useState(false);
 
+  // Foto
+  const [fotoUrl, setFotoUrl]           = useState<string | null>(null);
+  const [fotoUploading, setFotoUploading] = useState(false);
+  const fotoInputRef                      = useRef<HTMLInputElement>(null);
+
+  // Assinatura
+  const [assinaturaUrl, setAssinaturaUrl]         = useState<string | null>(null);
+  const [assinaturaUploading, setAssinaturaUploading] = useState(false);
+  const assinaturaInputRef                            = useRef<HTMLInputElement>(null);
+  // Canvas
+  const canvasRef      = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const lastPos        = useRef<{ x: number; y: number } | null>(null);
+
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm(p => ({ ...p, [k]: v }));
   }
@@ -95,7 +115,11 @@ export function UsuariosFormPage() {
     if (!isEdit) return;
     setLoading(true);
     service.findOne(Number(codigo))
-      .then(u => setForm(fromEntity(u)))
+      .then(u => {
+        setForm(fromEntity(u));
+        setFotoUrl(u.fotoUrlSigned ?? null);
+        setAssinaturaUrl(u.assinaturaUrlSigned ?? null);
+      })
       .catch(() => setError('Não foi possível carregar o usuário.'))
       .finally(() => setLoading(false));
     loadPerfisUsuario(Number(codigo));
@@ -109,17 +133,130 @@ export function UsuariosFormPage() {
       .catch(() => {});
   }, [isEdit, perfisService]);
 
-  // Autocomplete: busca Unidade Administrativa (segmento)
+  // Autocomplete: busca Unidade Administrativa (nome OU sigla)
   const fetchSegmentos = useCallback(async (q: string): Promise<AutocompleteOption[]> => {
-    const res = await unidadeAdmService.findAll(1, 20, { nome: q } as any);
-    return (res.data as any[]).map((s: any) => ({ value: s.codigo, label: `${s.sigla ? s.sigla + ' - ' : ''}${s.nome}` }));
+    const res = await unidadeAdmService.search(q, 20);
+    return res.data.map(s => ({ value: s.codigo, label: `${s.sigla ? s.sigla + ' — ' : ''}${s.nome}` }));
   }, [unidadeAdmService]);
 
-  // Autocomplete: busca Entidade Externa
+  // Autocomplete: busca Entidade Externa (por nome)
   const fetchEntidades = useCallback(async (q: string): Promise<AutocompleteOption[]> => {
-    const res = await (entidadeExternaService as any).search({ q, limit: 20 });
-    return (res as any[]).map((e: any) => ({ value: e.codigo, label: e.nome }));
+    const res = await entidadeExternaService.search(q, 20);
+    return res.map(e => ({ value: e.codigo, label: `${e.sigla ? e.sigla + ' — ' : ''}${e.nome}` }));
   }, [entidadeExternaService]);
+
+  // ── Foto handlers ──────────────────────────────────────────────────────────
+  async function handleFotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !isEdit) return;
+    setFotoUploading(true);
+    try {
+      const res = await service.uploadFoto(Number(codigo), file);
+      setFotoUrl(res.fotoUrlSigned);
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Erro ao enviar foto.');
+    } finally {
+      setFotoUploading(false);
+      if (fotoInputRef.current) fotoInputRef.current.value = '';
+    }
+  }
+
+  async function handleFotoRemove() {
+    if (!isEdit) return;
+    setFotoUploading(true);
+    try {
+      await service.removeFoto(Number(codigo));
+      setFotoUrl(null);
+    } catch { setError('Erro ao remover foto.'); }
+    finally { setFotoUploading(false); }
+  }
+
+  // ── Assinatura upload handler ───────────────────────────────────────────────
+  async function handleAssinaturaChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !isEdit) return;
+    setAssinaturaUploading(true);
+    try {
+      const res = await service.uploadAssinatura(Number(codigo), file);
+      setAssinaturaUrl(res.assinaturaUrlSigned);
+    } catch (err: any) {
+      setError(err?.response?.data?.message ?? 'Erro ao enviar assinatura.');
+    } finally {
+      setAssinaturaUploading(false);
+      if (assinaturaInputRef.current) assinaturaInputRef.current.value = '';
+    }
+  }
+
+  async function handleAssinaturaRemove() {
+    if (!isEdit) return;
+    setAssinaturaUploading(true);
+    try {
+      await service.removeAssinatura(Number(codigo));
+      setAssinaturaUrl(null);
+    } catch { setError('Erro ao remover assinatura.'); }
+    finally { setAssinaturaUploading(false); }
+  }
+
+  // ── Canvas drawing ──────────────────────────────────────────────────────────
+  function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if ('touches' in e) {
+      const t = e.touches[0];
+      return { x: (t.clientX - rect.left) * scaleX, y: (t.clientY - rect.top) * scaleY };
+    }
+    return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
+
+  function canvasStart(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    setIsDrawing(true);
+    lastPos.current = getPos(e);
+  }
+
+  function canvasDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext('2d')!;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current!.x, lastPos.current!.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    lastPos.current = pos;
+  }
+
+  function canvasEnd() { setIsDrawing(false); lastPos.current = null; }
+
+  function canvasClear() {
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  async function canvasSave() {
+    const canvas = canvasRef.current!;
+    if (!isEdit) return;
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], 'assinatura.png', { type: 'image/png' });
+      setAssinaturaUploading(true);
+      try {
+        const res = await service.uploadAssinatura(Number(codigo), file);
+        setAssinaturaUrl(res.assinaturaUrlSigned);
+        canvasClear();
+      } catch (err: any) {
+        setError(err?.response?.data?.message ?? 'Erro ao salvar assinatura.');
+      } finally { setAssinaturaUploading(false); }
+    }, 'image/png');
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -216,7 +353,7 @@ export function UsuariosFormPage() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 16, borderBottom: '1px solid var(--border)' }}>
-        {([['dados', 'Dados Pessoais'], ['perfis', 'Perfis']] as [Tab, string][]).map(([t, label]) => (
+        {([ ['dados', 'Dados Pessoais'], ['perfis', 'Perfis'], ...(isEdit ? [['foto', 'Foto'], ['assinatura', 'Assinatura']] : [])] as [Tab, string][]).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: '9px 18px', border: 'none', background: 'none', cursor: 'pointer',
             fontSize: 13.5, fontWeight: tab === t ? 600 : 400,
@@ -410,6 +547,142 @@ export function UsuariosFormPage() {
             </div>
           </div>
         </form>
+      )}
+
+      {/* ── Tab: Foto ── */}
+      {tab === 'foto' && (
+        <div className="card" style={{ padding: '32px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+          {/* Foto atual */}
+          <div style={{
+            width: 200, height: 200, borderRadius: 12,
+            border: '2px dashed var(--border)', overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--surface-2)',
+          }}>
+            {fotoUrl ? (
+              <img src={fotoUrl} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ color: 'var(--text-3)', fontSize: 13 }}>Sem foto</span>
+            )}
+          </div>
+
+          {/* Ações */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              style={{ display: 'none' }}
+              onChange={handleFotoChange}
+            />
+            <button
+              className="btn btn-primary btn-sm"
+              disabled={fotoUploading}
+              onClick={() => fotoInputRef.current?.click()}
+            >
+              <IconUpload size={13} />
+              {fotoUrl ? ' Alterar foto' : ' Enviar foto'}
+            </button>
+            {fotoUrl && (
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={fotoUploading}
+                onClick={handleFotoRemove}
+                style={{ color: 'var(--danger-500)' }}
+              >
+                <IconTrash size={13} /> Remover
+              </button>
+            )}
+          </div>
+
+          <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', maxWidth: 320 }}>
+            Formatos aceitos: JPEG, PNG, WebP, GIF · Tamanho máximo: 5 MB<br />
+            A imagem será redimensionada para até 400×400 px.
+          </p>
+        </div>
+      )}
+
+      {/* ── Tab: Assinatura ── */}
+      {tab === 'assinatura' && (
+        <div className="card" style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+          {/* Assinatura atual */}
+          {assinaturaUrl && (
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>Assinatura atual</p>
+              <div style={{
+                border: '1px solid var(--border)', borderRadius: 10, padding: 16,
+                background: '#fff', display: 'inline-block',
+              }}>
+                <img src={assinaturaUrl} alt="Assinatura" style={{ maxHeight: 120, display: 'block' }} />
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={assinaturaUploading}
+                  onClick={handleAssinaturaRemove}
+                  style={{ color: 'var(--danger-500)' }}
+                >
+                  <IconTrash size={13} /> Remover assinatura
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Opção 1: desenhar */}
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8 }}>
+                <IconPencil size={13} /> Desenhar assinatura
+              </p>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: '#fff', display: 'inline-block', cursor: 'crosshair', touchAction: 'none' }}>
+                <canvas
+                  ref={canvasRef}
+                  width={520}
+                  height={180}
+                  style={{ display: 'block', maxWidth: '100%' }}
+                  onMouseDown={canvasStart}
+                  onMouseMove={canvasDraw}
+                  onMouseUp={canvasEnd}
+                  onMouseLeave={canvasEnd}
+                  onTouchStart={canvasStart}
+                  onTouchMove={canvasDraw}
+                  onTouchEnd={canvasEnd}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button className="btn btn-primary btn-sm" disabled={assinaturaUploading} onClick={canvasSave}>
+                  {assinaturaUploading ? 'Salvando…' : 'Salvar assinatura desenhada'}
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={canvasClear}>Limpar</button>
+              </div>
+            </div>
+
+            {/* Opção 2: upload de arquivo */}
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 8 }}>
+                <IconUpload size={13} /> Ou enviar imagem de arquivo
+              </p>
+              <input
+                ref={assinaturaInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={handleAssinaturaChange}
+              />
+              <button
+                className="btn btn-secondary btn-sm"
+                disabled={assinaturaUploading}
+                onClick={() => assinaturaInputRef.current?.click()}
+              >
+                <IconUpload size={13} /> Selecionar arquivo
+              </button>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
+                JPEG, PNG, WebP · máx. 5 MB · fundo branco recomendado
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Tab: Perfis ── */}

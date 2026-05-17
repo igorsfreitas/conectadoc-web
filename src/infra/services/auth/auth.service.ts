@@ -14,7 +14,6 @@ export interface LoginResponse {
   };
   isAdmin: boolean;
   permissions: string[];
-  tenant: string;
 }
 
 export class AuthService {

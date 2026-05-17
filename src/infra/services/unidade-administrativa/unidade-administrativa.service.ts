@@ -18,6 +18,14 @@ export class UnidadeAdministrativaService {
     return res.data;
   }
 
+  /** Busca livre por nome OU sigla — usada nos autocompletes */
+  async search(q: string, limit = 20): Promise<Paginated<UnidadeAdministrativa>> {
+    const res = await this.httpClient.get<Paginated<UnidadeAdministrativa>>('/v1/unidade-administrativa', {
+      params: { q, limit, page: 1 },
+    });
+    return res.data;
+  }
+
   async findAllSimple(): Promise<UnidadeAdministrativa[]> {
     const res = await this.httpClient.get<UnidadeAdministrativa[]>('/v1/unidade-administrativa/simple');
     return res.data;

@@ -160,7 +160,7 @@ export function UnidadeAdministrativaPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Unidades Administrativas</h1>
-          <p className="page-subtitle">Estrutura organizacional do tenant</p>
+          <p className="page-subtitle">Estrutura organizacional</p>
         </div>
       </div>
 

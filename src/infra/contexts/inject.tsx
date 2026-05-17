@@ -3,7 +3,6 @@ import { createContext, ReactElement } from "react";
 import { AuthService } from "../services/auth/auth.service";
 import { PinErrorInterceptors } from "../services/http-client/interceptors/errors";
 import { LogInterceptor } from "../services/http-client/interceptors/log";
-import { TenantInterceptor } from "../services/http-client/interceptors/tenant";
 import { ProfileService } from "../services/profile/profile.service";
 import { AssuntosService } from "../services/assuntos/assuntos.service";
 import { HierarquiaService } from "../services/hierarquia/hierarquia.service";
@@ -43,7 +42,6 @@ export function DependencyInjectionManager({ children }: Props) {
     undefined,
     new PinErrorInterceptors(),
     import.meta.env.VITE_APP_BASE_URL,
-    [new TenantInterceptor()],
   );
 
   const dependenciesToInject: Dependences = {

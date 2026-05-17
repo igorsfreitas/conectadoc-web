@@ -33,6 +33,7 @@ export interface UpdateUnidadeAdministrativaPayload {
 }
 
 export interface UnidadeAdministrativaFilter {
+  q?: string;
   nome?: string;
   sigla?: string;
   protocoloCentral?: boolean;

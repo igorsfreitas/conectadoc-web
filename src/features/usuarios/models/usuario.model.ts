@@ -26,6 +26,8 @@ export interface Usuario {
   flagExcluido: number | null;
   tipo: string | null;
   senha?: string | null;
+  fotoUrlSigned?: string | null;
+  assinaturaUrlSigned?: string | null;
 }
 
 export interface UsuarioFilter {

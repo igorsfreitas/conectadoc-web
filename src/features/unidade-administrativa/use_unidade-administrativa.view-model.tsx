@@ -15,7 +15,7 @@ export type DialogMode = 'create' | 'edit' | 'delete' | null;
 
 const DEFAULT_LIMIT = 20;
 
-// Retorna o primeiro código de entidade que corresponde ao tenant atual.
+// Retorna o primeiro código de entidade padrão.
 // Heurística: entidade cujo nome contenha "PREFEITURA" ou seja a primeira da lista.
 function detectDefaultEntidade(list: EntidadeExterna[]): string {
   const match = list.find(e => e.nome?.toUpperCase().includes('PREFEITURA'));
@@ -58,7 +58,7 @@ export function useUnidadeAdministrativaViewModel() {
       setAllUnidades(simpleRes);
       const defaultCod = detectDefaultEntidade(entRes.data);
       setDefaultEntidadeCodigo(defaultCod);
-      // Inicializa o filtro de unidade externa com o tenant atual
+      // Inicializa o filtro com a entidade externa padrão
       setFilter(prev => ({ ...prev, codigoEntidadeExterna: defaultCod }));
     } catch {
       // non-blocking

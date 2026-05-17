@@ -1,8 +1,9 @@
 import { FormEvent, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { Pagination } from '../../../infra/components/pagination';
 import { useInject } from '../../../infra/hooks/inject';
-import { Usuario, UsuarioFilter, TIPO_SANGUINEO } from '../models/usuario.model';
+import { Usuario, UsuarioFilter } from '../models/usuario.model';
 import { Paginated } from '../../../infra/types/paginated';
 import { afinzAppPaths } from '../../../infra/router/paths/afinz_app';
 
@@ -14,6 +15,9 @@ function IconSearch({ size = 14 }: { size?: number }) {
 }
 function IconChevron({ size = 14 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>;
+}
+function IconExcel({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8l4 4-4 4M13 16h4"/></svg>;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -35,6 +39,7 @@ export function UsuariosListPage() {
   const [fMatricula, setFMatricula] = useState('');
   const [fAtivo, setFAtivo]       = useState(false);
   const [fInativo, setFInativo]   = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async (p: number, f: UsuarioFilter) => {
     setLoading(true); setError(null);
@@ -56,6 +61,31 @@ export function UsuariosListPage() {
     if (fAtivo)     f.ativo     = true;
     if (fInativo)   f.inativo   = true;
     setFilter(f); setPage(1);
+  }
+
+  async function handleExportExcel() {
+    setExporting(true);
+    try {
+      const rows = await service.findAllExport(filter);
+      const wsData = [
+        ['NOME', 'LOGIN', 'FUNÇÃO', 'LOCAL DE TRABALHO'],
+        ...rows.map(u => [
+          u.nome ?? '',
+          u.cpf ?? '',
+          u.funcao ?? '',
+          u.localTrabalho ?? '',
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = [{ wch: 40 }, { wch: 16 }, { wch: 30 }, { wch: 50 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Grid');
+      XLSX.writeFile(wb, 'usuarios.xlsx');
+    } catch {
+      alert('Erro ao gerar Excel. Tente novamente.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function handleClear() {
@@ -111,9 +141,19 @@ export function UsuariosListPage() {
           <h3 className="card-title">
             Usuários {total > 0 && <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>[{total}]</span>}
           </h3>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate(`${afinzAppPaths.usuarios.asRoute}/novo`)}>
-            <IconPlus size={13} /> Novo usuário
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleExportExcel}
+              disabled={exporting || total === 0}
+              title="Exportar todos os usuários do filtro atual"
+            >
+              <IconExcel size={13} /> {exporting ? 'Gerando…' : 'Gerar Excel'}
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate(`${afinzAppPaths.usuarios.asRoute}/novo`)}>
+              <IconPlus size={13} /> Novo usuário
+            </button>
+          </div>
         </div>
 
         {error && (

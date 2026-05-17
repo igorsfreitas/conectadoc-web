@@ -17,6 +17,14 @@ export class EntidadeExternaService {
     return res.data;
   }
 
+  /** Busca livre por nome — usada nos autocompletes */
+  async search(q: string, limit = 20): Promise<EntidadeExterna[]> {
+    const res = await this.httpClient.get<EntidadeExterna[]>('/v1/entidade-externa/search', {
+      params: { q, limit },
+    });
+    return res.data;
+  }
+
   async findOne(codigo: number): Promise<EntidadeExterna> {
     const res = await this.httpClient.get<EntidadeExterna>(`/v1/entidade-externa/${codigo}`);
     return res.data;
