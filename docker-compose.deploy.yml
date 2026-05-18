@@ -1,0 +1,17 @@
+name: conectadoc-web
+
+services:
+  web:
+    container_name: conectadoc-web
+    image: conectadoc-web:${APP_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - conectadoc_internal
+
+networks:
+  conectadoc_internal:
+    external: true
+    name: ${DOCKER_NETWORK:-conectadoc_internal}

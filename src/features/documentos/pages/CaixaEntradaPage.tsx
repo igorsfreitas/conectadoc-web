@@ -1,7 +1,6 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInject } from "../../../infra/hooks/inject";
-import { ProfileContext } from "../../../infra/contexts/profile";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CaixaItem, CaixaResponse, CaixaCounts, CaixaTab } from "../models/documento.model";
 
@@ -33,7 +32,6 @@ const TABS: { key: CaixaTab; label: string }[] = [
 export function CaixaEntradaPage() {
   const navigate = useNavigate();
   const service = useInject("DocumentosService");
-  const { profile } = useContext(ProfileContext);
 
   const [tab, setTab] = useState<CaixaTab>("entrada");
   const [search, setSearch] = useState("");
@@ -104,7 +102,7 @@ export function CaixaEntradaPage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text, #111)", margin: 0 }}>Caixa de Entrada</h1>
           <p style={{ fontSize: 13, color: "var(--text-3, #6b7280)", margin: "4px 0 0" }}>
-            {segmentoSigla ?? "…"} · Documentos sob sua responsabilidade
+            {segmentoSigla ?? "…"}{segmentoNome ? ` · ${segmentoNome}` : ""} · Documentos sob sua responsabilidade
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>

@@ -4,8 +4,6 @@ import { Dialog } from '../../../../infra/components/dialog';
 import { Pagination } from '../../../../infra/components/pagination';
 import { useUnidadeAdministrativaViewModel } from '../../use_unidade-administrativa.view-model';
 import { UnidadeAdministrativa, UnidadeAdministrativaFilter } from '../../models/unidade-administrativa.model';
-import { EntidadeExterna } from '../../../entidade-externa/models/entidade-externa.model';
-import { HierarquiaSegmento } from '../../../hierarquia/models/hierarquia.model';
 
 function IconPlus({ size = 14 }: { size?: number }) {
   return (
@@ -56,14 +54,6 @@ function RowMenu({ row, onEdit, onDelete }: {
   );
 }
 
-function entidadeLabel(list: EntidadeExterna[], codigo: string | null) {
-  if (!codigo) return '—';
-  return list.find(e => String(e.codigo) === String(codigo))?.nome ?? codigo;
-}
-function hierarquiaLabel(list: HierarquiaSegmento[], codigo: string | null) {
-  if (!codigo) return '—';
-  return list.find(h => String(h.codigo) === String(codigo))?.nome ?? codigo;
-}
 function unidadeLabel(list: UnidadeAdministrativa[], codigoPai: number | null) {
   if (!codigoPai) return '—';
   return list.find(u => u.codigo === codigoPai)?.nome ?? String(codigoPai);
@@ -101,7 +91,7 @@ export function UnidadeAdministrativaPage() {
     data, allUnidades, entidades, hierarquias,
     loading, saving, error,
     page, totalPages, total, limit, goToPage,
-    filter, defaultEntidadeCodigo,
+    defaultEntidadeCodigo,
     dialogMode, selected,
     openCreate, openEdit, openDelete, closeDialog,
     handleCreate, handleUpdate, handleDelete,

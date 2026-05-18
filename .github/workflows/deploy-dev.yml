@@ -1,0 +1,131 @@
+name: Deploy Web DEV
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: conectadoc-dev-web
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup Bitbucket SSH access
+        env:
+          BITBUCKET_SSH_KEY: ${{ secrets.BITBUCKET_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan bitbucket.org >> ~/.ssh/known_hosts
+          if [ -n "${BITBUCKET_SSH_KEY:-}" ]; then
+            printf '%s\n' "$BITBUCKET_SSH_KEY" | tr -d '\r' > ~/.ssh/bitbucket_deploy_key
+            chmod 600 ~/.ssh/bitbucket_deploy_key
+            cat > ~/.ssh/config <<'EOF'
+          Host bitbucket.org
+            HostName bitbucket.org
+            User git
+            IdentityFile ~/.ssh/bitbucket_deploy_key
+            IdentitiesOnly yes
+          EOF
+          fi
+
+      - name: Write production env
+        env:
+          WEB_ENV_FILE: ${{ secrets.WEB_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEB_ENV_FILE:-}" ]; then
+            echo "WEB_ENV_FILE secret is required"
+            exit 1
+          fi
+          printf '%s\n' "$WEB_ENV_FILE" > .env.production
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conectadoc-web-dist
+          path: |
+            dist
+            Dockerfile
+            nginx.conf
+            docker-compose.deploy.yml
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy web
+    runs-on: ubuntu-latest
+    needs: build
+    environment: dev
+    env:
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+      DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH || '/opt/conectadoc' }}
+      RELEASE_ID: ${{ github.sha }}
+      DOCKER_NETWORK: conectadoc_internal
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conectadoc-web-dist
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/conectadoc_deploy_key
+          chmod 600 ~/.ssh/conectadoc_deploy_key
+          ssh-keyscan -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$DEPLOY_BASE_PATH/apps/web/releases/$RELEASE_ID"
+          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+            "mkdir -p '$RELEASE_DIR'"
+          tar -czf - dist Dockerfile nginx.conf docker-compose.deploy.yml | ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+            "tar -xzf - -C '$RELEASE_DIR'"
+
+      - name: Run Docker Compose
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+            "DEPLOY_BASE_PATH='$DEPLOY_BASE_PATH' RELEASE_ID='$RELEASE_ID' DOCKER_NETWORK='$DOCKER_NETWORK' bash -s" <<'REMOTE'
+          set -euo pipefail
+          APP_DIR="$DEPLOY_BASE_PATH/apps/web"
+          RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
+          ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+          cd "$APP_DIR/current"
+          APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml build
+          APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml up -d --remove-orphans
+          docker image prune -f --filter "until=168h"
+          find "$APP_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          REMOTE
+
+      - name: Verify container
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+            "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"

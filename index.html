@@ -4,13 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script type="application/javascript" src="starter.js"></script>
     <title>ConectaDoc</title>
   </head>
   <body class="light-theme">
     <div id="root"></div>
     <script type="application/javascript">
-      const uuid = uuidV4();
+      const uuid = crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0;
+            const v = c === 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
       sessionStorage.setItem('uuidSession', uuid);
     </script>
     <script type="module" src="/src/main.tsx"></script>

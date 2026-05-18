@@ -68,7 +68,7 @@ function RowMenu({ row, onEdit, onDelete }: {
 
 // ── Casos de Uso dialog ────────────────────────────────────────────────────
 function CasosDeUsoDialog({
-  perfil, ucList, ucLoading, saving, error,
+  ucList, ucLoading, saving, error,
   onAdd, onRemove, onClose,
 }: {
   perfil: Perfil;

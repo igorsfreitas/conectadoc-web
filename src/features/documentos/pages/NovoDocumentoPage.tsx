@@ -178,8 +178,9 @@ function AtributoField({
   }
 
   // tipo=8 → multi-value (simple comma-separated for now)
-  if (tipo === 8 && atributo.multiploValor) {
-    const opts = atributo.multiploValor.split("|").filter(Boolean);
+  const multiploValor = (atributo as AtributoTipoDocumento & { multiploValor?: string | null }).multiploValor;
+  if (tipo === 8 && multiploValor) {
+    const opts = multiploValor.split("|").filter(Boolean);
     return (
       <div style={{ marginBottom: 16 }}>
         <label style={fieldLabel}>
@@ -230,7 +231,6 @@ function AtributoField({
         onChange={e => onChange(e.target.value)}
         onFocus={focusStyle}
         onBlur={blurStyle}
-        style={inputStyle}
         style={{
           ...inputStyle,
           textTransform: tipo === 16 ? "uppercase" : "none",
@@ -338,6 +338,7 @@ export function NovoDocumentoPage() {
   // Step 3 → finish: save atributos + content and go to caixa
   async function handleSalvarConteudo(rascunho = false) {
     if (!createdDoc || saving) return;
+    void rascunho;
     setSaving(true);
     setError(null);
     try {
@@ -449,7 +450,6 @@ export function NovoDocumentoPage() {
 
   const catInfo    = CATEGORIES.find(c => c.id === category);
   const tipoItems  = tipos.map(t => ({ codigo: t.codigo, label: `${t.sigla ? t.sigla + " — " : ""}${t.nome ?? String(t.codigo)}` }));
-  const tipoSelecionado = tipoItems.find(t => t.codigo === codigoTipo);
   const segSelecionado  = segmentos.find(s => s.codigo === codigoSegmentoCriador);
 
   // ── Step 2 — Metadados ─────────────────────────────────────────────────────

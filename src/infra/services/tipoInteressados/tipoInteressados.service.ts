@@ -1,6 +1,6 @@
 import { HttpClient } from '@afinz/rest-client';
 
-import { TipoInteressado, TipoInteressadoPayload } from '../../features/tipoInteressados/models/tipoInteressado.model';
+import { TipoInteressado, TipoInteressadoPayload } from '../../../features/tipoInteressados/models/tipoInteressado.model';
 
 export class TipoInteressadosService {
   constructor(private readonly httpClient: HttpClient) {}

@@ -63,7 +63,7 @@ export function Login() {
         localStorage.removeItem(KEY_SENHA);
       }
       const profileRes = await profileService.getProfile();
-      if (!(profileRes instanceof Error)) setProfile(profileRes as typeof profileRes);
+      if (!(profileRes instanceof AfinzApiError)) setProfile(profileRes);
       navigate(afinzAppPaths.assuntos.asRoute, { replace: true });
     } finally {
       setLoading(false);

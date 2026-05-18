@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useInject } from '../../infra/hooks/inject';
-import { TipoEntidadeExterna } from '../tipo-entidade-externa/models/tipo-entidade-externa.model';
 import { EntidadeExterna } from '../entidade-externa/models/entidade-externa.model';
 import {
   UnidadeAdministrativa,
