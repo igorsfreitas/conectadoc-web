@@ -116,12 +116,16 @@ jobs:
           set -euo pipefail
           APP_DIR="$DEPLOY_BASE_PATH/apps/web"
           RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
-          ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
-          cd "$APP_DIR/current"
-          APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml build
-          APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml up -d --remove-orphans
-          docker image prune -f --filter "until=168h"
-          find "$APP_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          LOCK_FILE="$DEPLOY_BASE_PATH/deploy.lock"
+          (
+            flock -w 900 9
+            ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+            cd "$APP_DIR/current"
+            APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml build
+            APP_VERSION="$RELEASE_ID" DOCKER_NETWORK="$DOCKER_NETWORK" docker compose -f docker-compose.deploy.yml up -d --remove-orphans
+            docker image prune -f --filter "until=168h"
+            find "$APP_DIR/releases" -mindepth 1 -maxdepth 1 -type d | sort | head -n -5 | xargs -r rm -rf
+          ) 9>"$LOCK_FILE"
           REMOTE
 
       - name: Verify container
