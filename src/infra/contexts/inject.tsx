@@ -14,6 +14,7 @@ import { CasoUsoService } from "../services/caso-uso/caso-uso.service";
 import { PerfisService } from "../services/perfis/perfis.service";
 import { UsuariosService } from "../services/usuarios/usuarios.service";
 import { DocumentosService } from "../services/documentos/documentos.service";
+import { TipoInteressadosService } from "../services/tipoInteressados/tipoInteressados.service";
 
 export interface Dependences {
   AuthService: AuthService;
@@ -28,6 +29,7 @@ export interface Dependences {
   PerfisService: PerfisService;
   UsuariosService: UsuariosService;
   DocumentosService: DocumentosService;
+  TipoInteressadosService: TipoInteressadosService;
 }
 
 export const DependencyInjectionContext = createContext<Dependences | null>(null);
@@ -59,6 +61,7 @@ export function DependencyInjectionManager({ children }: Props) {
     PerfisService: new PerfisService(httpClient),
     UsuariosService: new UsuariosService(httpClient),
     DocumentosService: new DocumentosService(httpClient),
+    TipoInteressadosService: new TipoInteressadosService(httpClient),
   };
 
   return (

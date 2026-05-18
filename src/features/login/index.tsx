@@ -22,8 +22,13 @@ export function Login() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [cpf, setCpf] = useState("");
-  const [senha, setSenha] = useState("");
+  const KEY_CPF   = "cd_saved_cpf";
+  const KEY_SENHA = "cd_saved_senha";
+
+  const [cpf,   setCpf]   = useState(() => localStorage.getItem(KEY_CPF)   ?? "");
+  const [senha, setSenha] = useState(() => localStorage.getItem(KEY_SENHA) ?? "");
+  const [lembrar, setLembrar] = useState(() => !!localStorage.getItem(KEY_CPF));
+  const [lembrarSenha, setLembrarSenha] = useState(() => !!localStorage.getItem(KEY_SENHA));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -46,6 +51,16 @@ export function Login() {
       if (result instanceof AfinzApiError) {
         setError(result.message ?? "CPF ou senha inválidos.");
         return;
+      }
+      if (lembrar) {
+        localStorage.setItem(KEY_CPF, cpf);
+      } else {
+        localStorage.removeItem(KEY_CPF);
+      }
+      if (lembrarSenha) {
+        localStorage.setItem(KEY_SENHA, senha);
+      } else {
+        localStorage.removeItem(KEY_SENHA);
       }
       const profileRes = await profileService.getProfile();
       if (!(profileRes instanceof Error)) setProfile(profileRes as typeof profileRes);
@@ -113,6 +128,34 @@ export function Login() {
               required
               autoComplete="current-password"
             />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-2, #374151)", cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={lembrar}
+                onChange={e => {
+                  setLembrar(e.target.checked);
+                  if (!e.target.checked) {
+                    setLembrarSenha(false);
+                    localStorage.removeItem(KEY_SENHA);
+                  }
+                }}
+                style={{ width: 15, height: 15, cursor: "pointer", accentColor: "var(--brand-600, #2563eb)" }}
+              />
+              Salvar CPF neste dispositivo
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-2, #374151)", cursor: "pointer", userSelect: "none", opacity: lembrar ? 1 : 0.4 }}>
+              <input
+                type="checkbox"
+                checked={lembrarSenha}
+                disabled={!lembrar}
+                onChange={e => setLembrarSenha(e.target.checked)}
+                style={{ width: 15, height: 15, cursor: lembrar ? "pointer" : "not-allowed", accentColor: "var(--brand-600, #2563eb)" }}
+              />
+              Salvar senha neste dispositivo
+            </label>
           </div>
 
           <button

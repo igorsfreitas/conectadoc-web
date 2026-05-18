@@ -1,5 +1,41 @@
 export type CaixaTab = 'entrada' | 'saida' | 'posse' | 'pendencia' | 'circular' | 'gerencia';
 
+/** Tipo do campo: 1=STRING, 2=STRING HTML, 3=DATE, 4=INTEGER, 5=NUMERIC, 6=ASSOCIAÇÃO, 7=MULTI VALORADO, 8=BOOLEAN */
+export type AtributoTipoEnum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export interface AtributoTipo {
+  codigo: number;
+  codigoTipoDocumento: number;
+  nome: string | null;
+  label: string | null;
+  ordem: string | null;
+  tipo: AtributoTipoEnum | null;
+  aba: string | null;
+  flagCadastraComNulo: number | null;
+  multiploValor: string | null;
+  mascara: string | null;
+}
+
+export interface AtributoDocumento {
+  codigo: number;
+  codigoDocumento: number;
+  codigoAtributoTipo: number;
+  valor: string | null;
+  valorFloat: string | null;
+  valorData: string | null;
+}
+
+export interface AtributoValorPayload {
+  codigoAtributoTipo: number;
+  valor?: string | null;
+  valorFloat?: number | null;
+  valorData?: string | null;
+}
+
+export interface UpsertAtributosPayload {
+  atributos: AtributoValorPayload[];
+}
+
 export interface TipoDocumentoSimples {
   codigo: string;
   nome: string | null;
@@ -29,10 +65,12 @@ export interface CreateDocumentoResponse {
 
 export interface UpdateDocumentoPayload {
   resumo?: string;
+  despacho?: string;
   codigoAssunto?: number;
   codigoEstado?: number;
   flagExpedienteImpresso?: number;
   codigoSegmentoCriador?: number;
+  flagConfidencial?: number;
 }
 
 export interface CaixaItem {

@@ -1,11 +1,13 @@
 import { HttpClient } from '@afinz/rest-client';
 import {
+  AtributoDocumento,
   CaixaResponse,
   CaixaTab,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
   TipoDocumentoSimples,
   UpdateDocumentoPayload,
+  UpsertAtributosPayload,
 } from '../../../features/documentos/models/documento.model';
 
 export class DocumentosService {
@@ -41,5 +43,15 @@ export class DocumentosService {
 
   async atualizar(id: number, payload: UpdateDocumentoPayload): Promise<void> {
     await this.httpClient.patch(`/v1/documentos/${id}`, payload);
+  }
+
+  async findAtributos(id: number): Promise<AtributoDocumento[]> {
+    const res = await this.httpClient.get<AtributoDocumento[]>(`/v1/documentos/${id}/atributos`);
+    return res.data;
+  }
+
+  async upsertAtributos(id: number, payload: UpsertAtributosPayload): Promise<AtributoDocumento[]> {
+    const res = await this.httpClient.put<AtributoDocumento[]>(`/v1/documentos/${id}/atributos`, payload);
+    return res.data;
   }
 }

@@ -106,4 +106,9 @@ export const afinzAppPaths = {
     path: '/relatorios',
     asRoute: '/relatorios',
   },
+  tipoInteressados: {
+    name: 'Tipos de Interessado',
+    path: '/tipo-interessado',
+    asRoute: '/tipo-interessado',
+  },
 };

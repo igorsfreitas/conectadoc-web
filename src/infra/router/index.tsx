@@ -17,6 +17,7 @@ import { UsuariosListPage } from "../../features/usuarios/pages/UsuariosListPage
 import { UsuariosFormPage } from "../../features/usuarios/pages/UsuariosFormPage";
 import { InicioPage } from "../../features/inicio/pages/InicioPage";
 import { ConfiguracaoPage } from "../../features/configuracao/pages/ConfiguracaoPage";
+import { TipoInteressadosPage } from "../../features/tipoInteressados/pages/tipoInteressados_page";
 import { AppLayout } from "../template/app/index";
 import { ProfileManager, ProfileContext } from "../contexts/profile";
 import { afinzAppPaths } from "./paths/afinz_app";
@@ -56,6 +57,7 @@ function ProtectedRoutes() {
         <Route path={`${afinzAppPaths.usuarios.asRoute}/:codigo`} element={<UsuariosFormPage />} />
         <Route path={afinzAppPaths.inicio.asRoute} element={<InicioPage />} />
         <Route path={afinzAppPaths.configuracao.asRoute} element={<ConfiguracaoPage />} />
+        <Route path={afinzAppPaths.tipoInteressados.asRoute} element={<TipoInteressadosPage />} />
       </Route>
       <Route path="*" element={<ServerInstabilityPage />} />
     </Routes>

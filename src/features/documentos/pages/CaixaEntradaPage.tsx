@@ -272,17 +272,29 @@ export function CaixaEntradaPage() {
                         </span>
                       ) : "—"}
                     </td>
-                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-2, #374151)" }}>
-                        <span style={{ fontWeight: 500 }}>{item.origemSigla ?? "—"}</span>
-                        <span style={{ color: "var(--text-3, #9ca3af)" }}>→</span>
-                        <span style={{
-                          background: "var(--brand-600, #2563eb)", color: "#fff",
-                          borderRadius: 5, fontSize: 10.5, fontWeight: 600, padding: "2px 6px",
-                        }}>
-                          {item.destinoSigla ?? "—"}
+                    <td style={{ padding: "10px 12px" }}>
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto 1fr",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 12,
+                        minWidth: 160,
+                      }}>
+                        <span style={{ fontWeight: 500, color: "var(--text-2, #374151)", textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.origemSigla ?? "—"}
                         </span>
-                      </span>
+                        <span style={{ color: "var(--text-3, #9ca3af)", flexShrink: 0 }}>→</span>
+                        <span style={{ textAlign: "left" }}>
+                          <span style={{
+                            background: "var(--brand-600, #2563eb)", color: "#fff",
+                            borderRadius: 5, fontSize: 10.5, fontWeight: 600, padding: "2px 6px",
+                            whiteSpace: "nowrap",
+                          }}>
+                            {item.destinoSigla ?? "—"}
+                          </span>
+                        </span>
+                      </div>
                     </td>
                     <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
                       <span style={{
