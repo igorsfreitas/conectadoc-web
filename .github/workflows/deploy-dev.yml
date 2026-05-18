@@ -1,9 +1,6 @@
 name: Deploy Web DEV
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 concurrency:
