@@ -97,21 +97,21 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/conectadoc_deploy_key
           chmod 600 ~/.ssh/conectadoc_deploy_key
-          ssh-keyscan -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 30 -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts || true
 
       - name: Upload release
         run: |
           set -euo pipefail
           RELEASE_DIR="$DEPLOY_BASE_PATH/apps/web/releases/$RELEASE_ID"
-          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "mkdir -p '$RELEASE_DIR'"
-          tar -czf - dist Dockerfile nginx.conf docker-compose.deploy.yml | ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+          tar -czf - dist Dockerfile nginx.conf docker-compose.deploy.yml | ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "tar -xzf - -C '$RELEASE_DIR'"
 
       - name: Run Docker Compose
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "DEPLOY_BASE_PATH='$DEPLOY_BASE_PATH' RELEASE_ID='$RELEASE_ID' DOCKER_NETWORK='$DOCKER_NETWORK' bash -s" <<'REMOTE'
           set -euo pipefail
           APP_DIR="$DEPLOY_BASE_PATH/apps/web"
@@ -131,5 +131,5 @@ jobs:
       - name: Verify container
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/conectadoc_deploy_key -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"
