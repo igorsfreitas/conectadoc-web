@@ -47,18 +47,6 @@ const NAV_TRABALHO = [
   { path: afinzAppPaths.pesquisaAvancada.asRoute!,label: 'Pesquisa avançada', Icon: IconSearch   },
 ];
 
-const NAV_CADASTROS = [
-  { path: afinzAppPaths.hierarquia.asRoute!,           label: 'Hierarquia',             Icon: IconNetwork    },
-  { path: afinzAppPaths.assuntos.asRoute!,             label: 'Assuntos',               Icon: IconBook       },
-  { path: afinzAppPaths.tipoDocumento.asRoute!,        label: 'Tipos de Documento',     Icon: IconLayers     },
-  { path: afinzAppPaths.tipoEntidadeExterna.asRoute!,  label: 'Tipos de Entidade',      Icon: IconTag        },
-  { path: afinzAppPaths.entidadeExterna.asRoute!,      label: 'Entidades Externas',     Icon: IconBuilding   },
-  { path: afinzAppPaths.unidadeAdministrativa.asRoute!,label: 'Unidades Administrativas',Icon: IconBuilding  },
-  { path: afinzAppPaths.casoUso.asRoute!,              label: 'Casos de Uso',           Icon: IconMessage    },
-  { path: afinzAppPaths.perfis.asRoute!,               label: 'Perfis',                 Icon: IconShield     },
-  { path: afinzAppPaths.usuarios.asRoute!,             label: 'Usuários',               Icon: IconUserCheck  },
-];
-
 const NAV_GESTAO = [
   { path: afinzAppPaths.cracha.asRoute!,               label: 'Crachá',                 Icon: IconCreditCard },
   { path: afinzAppPaths.administracao.asRoute!,        label: 'Administração',          Icon: IconUsers      },
@@ -160,7 +148,6 @@ export function AppLayout() {
 
         <nav className="nav">
           <NavSection label="Trabalho"  items={NAV_TRABALHO}   defaultOpen={true}  />
-          <NavSection label="Cadastros" items={NAV_CADASTROS}  defaultOpen={false} />
           <NavSection label="Gestão"    items={NAV_GESTAO}     defaultOpen={true}  />
         </nav>
 

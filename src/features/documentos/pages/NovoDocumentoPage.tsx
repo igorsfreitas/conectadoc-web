@@ -4,6 +4,32 @@ import { AtributoTipoDocumento } from "../../tipo-documento/models/tipo-document
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CreateDocumentoResponse, TipoDocumentoSimples } from "../models/documento.model";
+import { RichEditor } from "../../../infra/components/rich-editor";
+
+// ── Multi-valor splitter — legacy data uses several different separators ──
+function parseMultiValor(raw: string): string[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  for (const sep of ["|", ";", "\n", "\r"]) {
+    if (trimmed.includes(sep)) {
+      return trimmed.split(sep).map(s => s.trim()).filter(Boolean);
+    }
+  }
+  // No explicit separator — split by ". " (preserves trailing dot in each token)
+  // Pattern matches the legacy "Sr. Sra. Srta. Dr. Dra. Ilmo Sr. Ilma Sra." format
+  if (/\. /.test(trimmed)) {
+    const parts: string[] = [];
+    const tokens = trimmed.split(/\s+/);
+    let buf = "";
+    for (const tok of tokens) {
+      buf = buf ? `${buf} ${tok}` : tok;
+      if (tok.endsWith(".")) { parts.push(buf); buf = ""; }
+    }
+    if (buf) parts.push(buf);
+    if (parts.length > 1) return parts;
+  }
+  return [trimmed];
+}
 
 type Category = "interno" | "externo" | "minuta" | "processo";
 
@@ -98,6 +124,269 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// ── Pencil icon ───────────────────────────────────────────────────────────────
+function IconPencil({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+// ── Format atributo value for preview row display ─────────────────────────────
+function formatAtributoValue(atributo: AtributoTipoDocumento, raw: string): string {
+  if (!raw) return "";
+  const t = atributo.tipo;
+  if (t === 11) return raw === "1" ? "Sim" : "Não";
+  if (t === 2) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : raw;
+  }
+  if (t === 7) {
+    // strip HTML tags for preview
+    const plain = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return plain.length > 80 ? `${plain.slice(0, 77)}…` : plain;
+  }
+  return raw.length > 100 ? `${raw.slice(0, 97)}…` : raw;
+}
+
+// ── FieldRow — single row in the right card ───────────────────────────────────
+function FieldRow({
+  label,
+  value,
+  placeholder = "Clique para preencher",
+  required,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  required?: boolean;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(140px, 220px) 1fr 32px",
+        gap: 16,
+        alignItems: "center",
+        width: "100%",
+        padding: "12px 16px",
+        background: active ? "oklch(0.96 0.04 250)" : "transparent",
+        border: "none",
+        borderBottom: "1px solid var(--border, #e5e7eb)",
+        cursor: "pointer",
+        textAlign: "left",
+        transition: "background .12s",
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--surface-2, #f9fafb)"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+    >
+      <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-2, #374151)" }}>
+        {label}{required && <span style={{ color: "#ef4444" }}>*</span>}
+      </div>
+      <div style={{
+        fontSize: 14,
+        color: value ? "var(--text, #111)" : "var(--text-3, #9ca3af)",
+        fontStyle: value ? "normal" : "italic",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+      }}>
+        {value || placeholder}
+      </div>
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3, #9ca3af)" }}>
+        <IconPencil size={15} />
+      </span>
+    </button>
+  );
+}
+
+// ── EditFieldDialog — opens an editor matching the atributo's tipo ────────────
+function EditFieldDialog({
+  atributo,
+  initialValue,
+  onSave,
+  onClose,
+}: {
+  atributo: AtributoTipoDocumento | null;
+  initialValue: string;
+  onSave: (v: string) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(initialValue);
+
+  useEffect(() => { setDraft(initialValue); }, [initialValue, atributo?.codigo]);
+
+  useEffect(() => {
+    if (!atributo) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [atributo, onClose]);
+
+  if (!atributo) return null;
+  const label = atributo.label ?? atributo.nome ?? `Campo ${atributo.codigo}`;
+  const tipo  = atributo.tipo;
+
+  const focusBorder = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    (e.target.style.borderColor = "var(--brand-600, #2563eb)");
+  const blurBorder = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    (e.target.style.borderColor = "var(--border, #d1d5db)");
+
+  function renderEditor() {
+    if (tipo === 11) {
+      return (
+        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "var(--text-2, #374151)", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={draft === "1"}
+            onChange={e => setDraft(e.target.checked ? "1" : "0")}
+            style={{ width: 18, height: 18, cursor: "pointer" }}
+          />
+          Marcar como verdadeiro
+        </label>
+      );
+    }
+    if (tipo === 2) {
+      return (
+        <input
+          type="date"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          autoFocus
+          onFocus={focusBorder}
+          onBlur={blurBorder}
+          style={inputStyle}
+        />
+      );
+    }
+    if (tipo === 7) {
+      return (
+        <RichEditor
+          value={draft}
+          onChange={setDraft}
+          minHeight={300}
+          placeholder={`Digite ${label.toLowerCase()}...`}
+        />
+      );
+    }
+    if (tipo === 8 && atributo.multiploValor) {
+      const opts = parseMultiValor(atributo.multiploValor);
+      return (
+        <select
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          autoFocus
+          onFocus={focusBorder}
+          onBlur={blurBorder}
+          style={selectStyle}
+        >
+          <option value="">Selecione…</option>
+          {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+    if (tipo === 6 || tipo === 4 || tipo === 5) {
+      return (
+        <input
+          type="number"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          autoFocus
+          onFocus={focusBorder}
+          onBlur={blurBorder}
+          style={inputStyle}
+        />
+      );
+    }
+    // default text input — multiline for non-trivial fields
+    if (draft.length > 60 || tipo === 15) {
+      return (
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          autoFocus
+          rows={6}
+          onFocus={focusBorder}
+          onBlur={blurBorder}
+          style={{
+            width: "100%", boxSizing: "border-box", resize: "vertical",
+            border: "1px solid var(--border, #d1d5db)", borderRadius: 8,
+            padding: "10px 12px", fontSize: 14, fontFamily: "inherit",
+            lineHeight: 1.5, outline: "none", color: "var(--text, #111)",
+            textTransform: tipo === 16 ? "uppercase" : "none",
+          }}
+        />
+      );
+    }
+    return (
+      <input
+        type="text"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        autoFocus
+        onFocus={focusBorder}
+        onBlur={blurBorder}
+        style={{ ...inputStyle, textTransform: tipo === 16 ? "uppercase" : "none" } as React.CSSProperties}
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 50,
+        background: "rgba(15, 23, 42, 0.45)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 720,
+          background: "#fff", borderRadius: 14,
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--text-3, #9ca3af)", marginBottom: 4 }}>
+            Editar campo
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text, #111)" }}>{label}</div>
+        </div>
+        <div style={{ padding: 24 }}>
+          {renderEditor()}
+        </div>
+        <div style={{
+          padding: "14px 20px", borderTop: "1px solid var(--border, #e5e7eb)",
+          display: "flex", justifyContent: "flex-end", gap: 10,
+          fontSize: 12, color: "var(--text-3, #6b7280)",
+        }}>
+          <button className="btn btn-secondary" onClick={onClose} style={{ minWidth: 100 }}>Cancelar</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => { onSave(draft); onClose(); }}
+            style={{ minWidth: 100, display: "flex", alignItems: "center", gap: 6 }}
+          >
+            ✓ Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── AtributoField — renders one template variable ─────────────────────────────
 function AtributoField({
   atributo,
@@ -153,34 +442,27 @@ function AtributoField({
     );
   }
 
-  // tipo=7 → textarea (String HTML / rich text)
+  // tipo=7 → String HTML → RichEditor
   if (tipo === 7) {
     return (
       <div style={{ marginBottom: 16 }}>
         <label style={fieldLabel}>
           {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
         </label>
-        <textarea
+        <RichEditor
           value={value}
-          onChange={e => onChange(e.target.value)}
-          rows={6}
-          style={{
-            width: "100%", boxSizing: "border-box", resize: "vertical",
-            border: "1px solid var(--border, #d1d5db)", borderRadius: 8,
-            padding: "10px 12px", fontSize: 14, fontFamily: "inherit",
-            lineHeight: 1.5, outline: "none", color: "var(--text, #111)",
-          }}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
+          onChange={onChange}
+          minHeight={220}
+          placeholder={`Digite ${label.toLowerCase()}...`}
         />
       </div>
     );
   }
 
-  // tipo=8 → multi-value (simple comma-separated for now)
-  const multiploValor = (atributo as AtributoTipoDocumento & { multiploValor?: string | null }).multiploValor;
+  // tipo=8 → multi-value (try multiple separators: |, ;, newline, then space-with-dot heuristic)
+  const multiploValor = atributo.multiploValor;
   if (tipo === 8 && multiploValor) {
-    const opts = multiploValor.split("|").filter(Boolean);
+    const opts = parseMultiValor(multiploValor);
     return (
       <div style={{ marginBottom: 16 }}>
         <label style={fieldLabel}>
@@ -267,6 +549,8 @@ export function NovoDocumentoPage() {
   const [atributos,      setAtributos]      = useState<AtributoTipoDocumento[]>([]);
   const [atributoValues, setAtributoValues] = useState<Record<number, string>>({});
   const [conteudo,       setConteudo]       = useState("");
+  const [editingAtributo, setEditingAtributo] = useState<AtributoTipoDocumento | null>(null);
+  const [editingConteudo, setEditingConteudo] = useState(false);
 
   // Document created
   const [createdDoc, setCreatedDoc] = useState<CreateDocumentoResponse | null>(null);
@@ -450,7 +734,6 @@ export function NovoDocumentoPage() {
 
   const catInfo    = CATEGORIES.find(c => c.id === category);
   const tipoItems  = tipos.map(t => ({ codigo: t.codigo, label: `${t.sigla ? t.sigla + " — " : ""}${t.nome ?? String(t.codigo)}` }));
-  const segSelecionado  = segmentos.find(s => s.codigo === codigoSegmentoCriador);
 
   // ── Step 2 — Metadados ─────────────────────────────────────────────────────
   if (step === 2) {
@@ -499,7 +782,7 @@ export function NovoDocumentoPage() {
               </select>
             </div>
             <div>
-              <label style={fieldLabel}>Unidade de origem <span style={{ color: "#ef4444" }}>*</span></label>
+              <label style={fieldLabel}>Unidade de cadastramento <span style={{ color: "#ef4444" }}>*</span></label>
               <select
                 style={selectStyle}
                 value={codigoSegmentoCriador ?? ""}
@@ -611,13 +894,19 @@ export function NovoDocumentoPage() {
     );
   }
 
-  // ── Step 3 — Conteúdo ──────────────────────────────────────────────────────
+  // ── Step 3 — Conteúdo (novo layout: cards lado-a-lado + rows com lápis) ────
+  const tipoNome     = createdDoc?.tipoDocumentoNome ?? "Documento";
+  const totalFields  = atributos.length;
+  const filledFields = atributos.filter(a => (atributoValues[a.codigo] ?? "").trim()).length;
+  const progresso    = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
+  const statusLabel  = filledFields === totalFields && totalFields > 0 ? "Pronto para tramitar" : "Em tramitação";
+
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text, #111)", margin: 0 }}>Conteúdo do documento</h1>
-          <p style={{ fontSize: 13, color: "var(--text-3, #6b7280)", margin: "4px 0 0" }}>Redija o corpo do documento</p>
+          <p style={{ fontSize: 13, color: "var(--text-3, #6b7280)", margin: "4px 0 0" }}>Preencha os campos clicando no ícone de edição</p>
         </div>
         <button
           style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--text-2)", background: "none", border: "none", cursor: "pointer" }}
@@ -629,109 +918,251 @@ export function NovoDocumentoPage() {
 
       <Stepper current={3} />
 
-      {/* Read-only header — dados gerados/preenchidos nos steps anteriores */}
-      {createdDoc && (
-        <div style={{
-          background: "oklch(0.97 0.008 250)",
-          border: "1px solid oklch(0.88 0.02 250)",
-          borderRadius: 12, padding: "18px 24px", marginBottom: 16,
-          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "14px 24px",
-        }}>
-          <InfoRow label="NetDoc"           value={createdDoc.numeroNetdoc} />
-          <InfoRow label="Data de criação"  value={new Date(createdDoc.dataHoraCriacao).toLocaleDateString("pt-BR")} />
-          <InfoRow label="Tipo"             value={[createdDoc.tipoDocumentoSigla, createdDoc.tipoDocumentoNome].filter(Boolean).join(" — ")} />
-          <InfoRow label="Unidade origem"   value={[createdDoc.segmentoOrigemSigla, createdDoc.segmentoOrigemNome].filter(Boolean).join(" — ")} />
-          {segSelecionado && <InfoRow label="Unid. cadastrante" value={`${segSelecionado.sigla ?? ""} ${segSelecionado.nome ?? ""}`.trim()} />}
-          {assunto        && <InfoRow label="Assunto"           value={assunto} />}
-          <InfoRow label="Suporte"          value={flagExpedienteImpresso === 0 ? "Digital" : "Físico"} />
-          {flagConfidencial && <InfoRow label="Sigilo" value="Sigiloso 🔒" />}
+      {error && (
+        <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 13, color: "#dc2626" }}>
+          {error}
         </div>
       )}
 
-      {/* Conteúdo editor */}
-      <div style={{ background: "#fff", border: "1px solid var(--border, #e5e7eb)", borderRadius: 16, padding: "28px 32px" }}>
-        {error && (
-          <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", fontSize: 13, color: "#dc2626" }}>
-            {error}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "260px 1fr",
+        gap: 24,
+        alignItems: "flex-start",
+      }}>
+        {/* ── Left summary card ─────────────────────────────────────── */}
+        <aside style={{
+          background: "#fff",
+          border: "1px solid var(--border, #e5e7eb)",
+          borderRadius: 14,
+          padding: "20px 22px",
+          position: "sticky",
+          top: 16,
+        }}>
+          <div style={{
+            fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+            letterSpacing: "0.07em", color: "var(--text-3, #9ca3af)", marginBottom: 6,
+          }}>
+            Documento
           </div>
-        )}
-
-        {/* Assunto — pré-preenchido, read-only neste step */}
-        {assunto && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={fieldLabel}>Assunto</label>
-            <div style={{
-              padding: "10px 12px", borderRadius: 8, fontSize: 14,
-              background: "var(--surface-2, #f9fafb)", border: "1px solid var(--border, #e5e7eb)",
-              color: "var(--text-2, #374151)", lineHeight: 1.5,
-            }}>
-              {assunto}
-            </div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text, #111)", marginBottom: 18, lineHeight: 1.3 }}>
+            {tipoNome}
           </div>
-        )}
 
-        {/* Dynamic template atributos from tipo de documento */}
-        {atributos.length > 0 && (
-          <>
-            <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--border, #e5e7eb)" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-3, #6b7280)" }}>
-                Campos do tipo de documento
-              </span>
-            </div>
-            {atributos.map(a => (
-              <AtributoField
-                key={a.codigo}
-                atributo={a}
-                value={atributoValues[a.codigo] ?? ""}
-                onChange={v => setAtributoValues(prev => ({ ...prev, [a.codigo]: v }))}
+          {createdDoc && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 12.5 }}>
+              <SummaryLine label="NetDoc"   value={createdDoc.numeroNetdoc} mono />
+              <SummaryLine label="Número"   value={createdDoc.numeroNetdoc} mono />
+              <SummaryLine label="Criação"  value={new Date(createdDoc.dataHoraCriacao).toLocaleDateString("pt-BR")} />
+              <SummaryLine label="Origem"   value={createdDoc.segmentoOrigemSigla ?? "—"} />
+              <SummaryLine
+                label="Status"
+                value={
+                  <span style={{
+                    fontSize: 11, fontWeight: 600,
+                    background: "oklch(0.94 0.04 220)",
+                    color: "oklch(0.40 0.14 220)",
+                    padding: "2px 10px", borderRadius: 999,
+                  }}>
+                    • {statusLabel}
+                  </span>
+                }
               />
-            ))}
-            <div style={{ marginBottom: 16, marginTop: -8, paddingBottom: 16, borderBottom: "1px solid var(--border, #e5e7eb)" }} />
-          </>
-        )}
+            </div>
+          )}
 
-        {/* Conteúdo */}
-        <div style={{ marginBottom: 24 }}>
-          <label style={fieldLabel}>
-            Conteúdo <span style={{ color: "#ef4444" }}>*</span>
-          </label>
-          <textarea
-            value={conteudo}
-            onChange={e => setConteudo(e.target.value)}
-            placeholder="Redija aqui o conteúdo do documento..."
-            rows={14}
+          <div style={{ height: 1, background: "var(--border)", margin: "18px 0" }} />
+
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--text-3, #9ca3af)", marginBottom: 8 }}>
+            Progresso
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, marginBottom: 6 }}>
+            <span style={{ color: "var(--text-2, #374151)" }}>Campos preenchidos</span>
+            <span style={{ fontWeight: 600, color: "var(--text, #111)" }}>{filledFields}/{totalFields || "—"}</span>
+          </div>
+          <div style={{ height: 6, background: "var(--surface-2, #f3f4f6)", borderRadius: 999, overflow: "hidden" }}>
+            <div style={{
+              width: `${progresso}%`, height: "100%",
+              background: "var(--brand-600, #2563eb)",
+              transition: "width .2s",
+            }} />
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
+            <SidebarBtn icon="👁">Pré-visualizar</SidebarBtn>
+            <SidebarBtn icon="👥">Co-autores (0)</SidebarBtn>
+            <SidebarBtn icon="📎">Anexos (0)</SidebarBtn>
+          </div>
+        </aside>
+
+        {/* ── Right form card ───────────────────────────────────────── */}
+        <section style={{ background: "#fff", border: "1px solid var(--border, #e5e7eb)", borderRadius: 14, overflow: "hidden" }}>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            padding: "18px 22px", borderBottom: "1px solid var(--border, #e5e7eb)", gap: 12,
+          }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text, #111)" }}>Dados do documento</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-3, #6b7280)", marginTop: 2 }}>
+                Os campos com <span style={{ color: "#ef4444" }}>*</span> são obrigatórios.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-secondary" style={{ height: 32, fontSize: 12.5, padding: "0 12px" }} title="Em breve">
+                ⚡ Preencher com IA
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ height: 32, fontSize: 12.5, padding: "0 12px" }}
+                onClick={() => handleSalvarConteudo(true)}
+                disabled={saving}
+              >
+                Salvar rascunho
+              </button>
+            </div>
+          </div>
+
+          {/* Field rows */}
+          <div>
+            {atributos.length > 0 ? (
+              atributos.map(a => {
+                const raw = atributoValues[a.codigo] ?? "";
+                return (
+                  <FieldRow
+                    key={a.codigo}
+                    label={a.label ?? a.nome ?? `Campo ${a.codigo}`}
+                    value={formatAtributoValue(a, raw)}
+                    required={a.flagCadastraComNulo === 0}
+                    active={editingAtributo?.codigo === a.codigo}
+                    onClick={() => setEditingAtributo(a)}
+                  />
+                );
+              })
+            ) : (
+              <FieldRow
+                label="Conteúdo"
+                value={conteudo ? conteudo.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 100) : ""}
+                required
+                onClick={() => setEditingConteudo(true)}
+              />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "14px 22px", borderTop: "1px solid var(--border, #e5e7eb)",
+            background: "var(--surface-2, #f9fafb)",
+          }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => { setStep(2); setError(null); }}
+            >
+              ‹ Voltar
+            </button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => handleSalvarConteudo(true)}
+                disabled={saving}
+              >
+                Salvar e sair
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleSalvarConteudo(false)}
+                disabled={saving}
+                style={{ minWidth: 160, display: "flex", alignItems: "center", gap: 6 }}
+              >
+                {saving ? "Salvando…" : <>Concluir e tramitar ✈</>}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Atributo edit dialog */}
+      <EditFieldDialog
+        atributo={editingAtributo}
+        initialValue={editingAtributo ? (atributoValues[editingAtributo.codigo] ?? "") : ""}
+        onSave={v => editingAtributo && setAtributoValues(prev => ({ ...prev, [editingAtributo.codigo]: v }))}
+        onClose={() => setEditingAtributo(null)}
+      />
+
+      {/* Conteúdo fallback dialog (when tipo has no atributos) */}
+      {editingConteudo && (
+        <div
+          onClick={() => setEditingConteudo(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
             style={{
-              width: "100%", boxSizing: "border-box", resize: "vertical",
-              border: "1px solid var(--border, #d1d5db)", borderRadius: 8,
-              padding: "12px 14px", fontSize: 14, fontFamily: "inherit",
-              lineHeight: 1.7, outline: "none", color: "var(--text, #111)",
+              width: "100%", maxWidth: 720,
+              background: "#fff", borderRadius: 14,
+              boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+              display: "flex", flexDirection: "column",
             }}
-            onFocus={e => (e.target.style.borderColor = "var(--brand-600, #2563eb)")}
-            onBlur={e  => (e.target.style.borderColor = "var(--border, #d1d5db)")}
-          />
-          <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "right", marginTop: 4 }}>
-            {conteudo.length} / 10.000
+          >
+            <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--text-3, #9ca3af)", marginBottom: 4 }}>
+                Editar campo
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text, #111)" }}>Conteúdo</div>
+            </div>
+            <div style={{ padding: 24 }}>
+              <RichEditor value={conteudo} onChange={setConteudo} minHeight={320} placeholder="Redija o conteúdo do documento..." />
+            </div>
+            <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border, #e5e7eb)", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button className="btn btn-secondary" onClick={() => setEditingConteudo(false)} style={{ minWidth: 100 }}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => setEditingConteudo(false)} style={{ minWidth: 100 }}>✓ Salvar</button>
+            </div>
           </div>
         </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border, #e5e7eb)" }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => handleSalvarConteudo(true)}
-            disabled={saving}
-          >
-            Salvar rascunho
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => handleSalvarConteudo(false)}
-            disabled={saving}
-            style={{ minWidth: 140 }}
-          >
-            {saving ? "Salvando…" : "Salvar documento"}
-          </button>
-        </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+// ── Sidebar helpers ───────────────────────────────────────────────────────────
+function SummaryLine({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+      <span style={{ color: "var(--text-3, #6b7280)" }}>{label}</span>
+      <span style={{
+        color: "var(--text, #111)",
+        fontFamily: mono ? "JetBrains Mono, monospace" : "inherit",
+        fontWeight: mono ? 500 : 400,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SidebarBtn({ icon, children }: { icon: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      title="Em breve"
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        height: 36, padding: "0 12px",
+        background: "var(--surface-2, #f9fafb)",
+        border: "1px solid var(--border, #e5e7eb)",
+        borderRadius: 8, fontSize: 13, color: "var(--text-2, #374151)",
+        cursor: "pointer", textAlign: "left",
+      }}
+    >
+      <span>{icon}</span>
+      <span>{children}</span>
+    </button>
   );
 }

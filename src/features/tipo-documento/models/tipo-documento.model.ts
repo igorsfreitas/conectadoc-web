@@ -2,19 +2,28 @@ export type AplicavelA = 1 | 2 | 3; // 1=INTERNO 2=EXTERNO 3=AMBOS
 
 // ── Atributo tipo documento ────────────────────────────────────────────────
 /**
- * Tipos de atributo (coluna `tipo` em netdoc_atributo_tipo):
- * 1=STRING, 2=STRING HTML, 3=DATE, 4=INTEGER, 5=NUMERIC,
- * 6=ASSOCIAÇÃO, 7=MULTI VALORADO, 8=BOOLEAN
+ * Tipos de atributo (coluna `tipo` em comum.netdoc_atributo_tipo) — mapping do legado:
+ *  1=Fone, 2=Data, 3=CPF, 4=CEP, 5=Moeda, 6=Numero, 7=String HTML,
+ *  8=Multi Valorado, 9=Associação, 10=Mascara, 11=Checkbox,
+ *  12=Associação Estática, 13=CNPJ, 14=Radio, 15=String, 16=String Maiúsculo
  */
 export const ATRIBUTO_TIPOS: Record<number, string> = {
-  1: 'STRING',
-  2: 'STRING HTML',
-  3: 'DATE',
-  4: 'INTEGER',
-  5: 'NUMERIC',
-  6: 'ASSOCIAÇÃO',
-  7: 'MULTI VALORADO',
-  8: 'BOOLEAN',
+  1:  'Fone',
+  2:  'Data',
+  3:  'CPF',
+  4:  'CEP',
+  5:  'Moeda',
+  6:  'Numero',
+  7:  'String HTML',
+  8:  'Multi Valorado',
+  9:  'Associação',
+  10: 'Mascara',
+  11: 'Checkbox',
+  12: 'Associação Estática',
+  13: 'CNPJ',
+  14: 'Radio',
+  15: 'String',
+  16: 'String Maiúsculo',
 };
 
 export interface AtributoTipoDocumento {
@@ -28,6 +37,8 @@ export interface AtributoTipoDocumento {
   flagCadastraComNulo: number | null;
   flagPesquisaPor: number | null;
   flagExcluido: number | null;
+  multiploValor?: string | null;
+  mascara?: string | null;
 }
 
 export interface AtributoTipoPayload {
