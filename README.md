@@ -9,6 +9,7 @@ Frontend React do ConectaDoc.
 - [Pre-requisitos](#pre-requisitos)
 - [Rodando localmente](#rodando-localmente)
 - [Variaveis de ambiente](#variaveis-de-ambiente)
+- [Documentacao operacional](#documentacao-operacional)
 - [Deploy DEV via GitHub Actions](#deploy-dev-via-github-actions)
 - [Scripts](#scripts)
 
@@ -64,6 +65,14 @@ http://localhost:5173
 | `VITE_APP_OPEN_SEARCH_URL` | URL de busca externa, quando existir | vazio |
 
 Para deploy DEV, as variaveis sao cadastradas no secret `WEB_ENV_FILE` e gravadas como `.env.production` durante o build.
+
+## Documentacao operacional
+
+Guias de setup e deploy:
+
+| Documento | Conteudo |
+| --- | --- |
+| [`docs/setup-infra-e-deploy-github.md`](docs/setup-infra-e-deploy-github.md) | Setup da infra automatizada, secrets, deploy manual do Web pelo GitHub Actions, validacao e rollback DEV |
 
 ## Deploy DEV via GitHub Actions
 
