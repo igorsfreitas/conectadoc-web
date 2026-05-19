@@ -112,18 +112,6 @@ const CATEGORIES: { id: Category; label: string; desc: string; color: string; bg
   { id: "processo", label: "Processo", desc: "Pasta com múltiplos documentos e fluxo",       color: "#10b981", bg: "#f0fdf4", icon: "📁" },
 ];
 
-// ── InfoRow — read-only field ─────────────────────────────────────────────────
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-3, #6b7280)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        {label}
-      </span>
-      <div style={{ fontSize: 13.5, color: "var(--text, #111)", marginTop: 2 }}>{value || "—"}</div>
-    </div>
-  );
-}
-
 // ── Pencil icon ───────────────────────────────────────────────────────────────
 function IconPencil({ size = 16 }: { size?: number }) {
   return (
@@ -278,7 +266,7 @@ function EditFieldDialog({
         />
       );
     }
-    if (tipo === 8 && atributo.multiploValor) {
+    if (tipo === 8 && atributo?.multiploValor) {
       const opts = parseMultiValor(atributo.multiploValor);
       return (
         <select
@@ -387,140 +375,6 @@ function EditFieldDialog({
   );
 }
 
-// ── AtributoField — renders one template variable ─────────────────────────────
-function AtributoField({
-  atributo,
-  value,
-  onChange,
-}: {
-  atributo: AtributoTipoDocumento;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const label = atributo.label ?? atributo.nome ?? `Campo ${atributo.codigo}`;
-  const required = atributo.flagCadastraComNulo === 0;
-  const tipo = atributo.tipo;
-
-  const focusStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    (e.target.style.borderColor = "var(--brand-600, #2563eb)");
-  const blurStyle = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    (e.target.style.borderColor = "var(--border, #d1d5db)");
-
-  // tipo=11 → checkbox
-  if (tipo === 11) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-2, #374151)", cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={value === "1"}
-            onChange={e => onChange(e.target.checked ? "1" : "0")}
-            style={{ width: 16, height: 16, cursor: "pointer" }}
-          />
-          {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-        </label>
-      </div>
-    );
-  }
-
-  // tipo=2 → date
-  if (tipo === 2) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <label style={fieldLabel}>
-          {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-        </label>
-        <input
-          type="date"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
-          style={inputStyle}
-        />
-      </div>
-    );
-  }
-
-  // tipo=7 → String HTML → RichEditor
-  if (tipo === 7) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <label style={fieldLabel}>
-          {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-        </label>
-        <RichEditor
-          value={value}
-          onChange={onChange}
-          minHeight={220}
-          placeholder={`Digite ${label.toLowerCase()}...`}
-        />
-      </div>
-    );
-  }
-
-  // tipo=8 → multi-value (try multiple separators: |, ;, newline, then space-with-dot heuristic)
-  const multiploValor = atributo.multiploValor;
-  if (tipo === 8 && multiploValor) {
-    const opts = parseMultiValor(multiploValor);
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <label style={fieldLabel}>
-          {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-        </label>
-        <select
-          style={selectStyle}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
-        >
-          <option value="">Selecione…</option>
-          {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-    );
-  }
-
-  // tipo=6/9/12 → numeric/integer
-  if (tipo === 6 || tipo === 4 || tipo === 5) {
-    return (
-      <div style={{ marginBottom: 16 }}>
-        <label style={fieldLabel}>
-          {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-        </label>
-        <input
-          type="number"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          onFocus={focusStyle}
-          onBlur={blurStyle}
-          style={inputStyle}
-        />
-      </div>
-    );
-  }
-
-  // default → text input (tipo=1,3,4,10,13,15,16 etc)
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={fieldLabel}>
-        {label}{required && <span style={{ color: "#ef4444" }}> *</span>}
-      </label>
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={focusStyle}
-        onBlur={blurStyle}
-        style={{
-          ...inputStyle,
-          textTransform: tipo === 16 ? "uppercase" : "none",
-        } as React.CSSProperties}
-      />
-    </div>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export function NovoDocumentoPage() {
