@@ -15,6 +15,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
   forwardRef,
 } from 'react';
 
@@ -101,6 +102,7 @@ const RD = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const HR = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const LK = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
 const SRC = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>;
+const IMG = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
 
 // ── RichEditor ─────────────────────────────────────────────────────────────
 export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEditor(
@@ -109,8 +111,10 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
 ) {
   const editorRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const showingSource = useRef(false);
   const savedRange = useRef<Range | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Initialize content
   useEffect(() => {
@@ -190,6 +194,34 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
     if (url) exec('createLink', url);
   }
 
+  async function handleImageUpload(file: File) {
+    saveSelection();
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/v1/storage/upload-editor-image', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert((err as { message?: string }).message ?? 'Erro ao fazer upload da imagem.');
+        return;
+      }
+      const { url } = await res.json() as { key: string; url: string };
+      restoreSelection();
+      editorRef.current?.focus();
+      document.execCommand('insertHTML', false, `<img src="${url}" alt="" style="max-width:100%;height:auto;border-radius:4px;" />`);
+      emitChange();
+    } catch {
+      alert('Erro ao enviar a imagem. Verifique sua conexão.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const formatOptions = [
     { label: 'Normal',    value: '<p>' },
     { label: 'Título 1',  value: 'h1' },
@@ -234,8 +266,30 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
           <Div />
           <TBtn title="Inserir link"         onClick={insertLink}><LK /></TBtn>
           <TBtn title="Linha horizontal"     onClick={() => exec('insertHorizontalRule')}><HR /></TBtn>
+          <Div />
+          <TBtn
+            title={uploading ? 'Enviando imagem…' : 'Inserir imagem'}
+            onClick={() => { if (!uploading) fileInputRef.current?.click(); }}
+          >
+            {uploading
+              ? <span style={{ fontSize: 10, color: 'var(--text-3)' }}>…</span>
+              : <IMG />}
+          </TBtn>
         </div>
       )}
+
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,image/avif"
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0];
+          if (file) void handleImageUpload(file);
+          e.target.value = '';
+        }}
+      />
 
       {/* Editor area */}
       <div
@@ -298,6 +352,7 @@ export const RichEditor = forwardRef<RichEditorHandle, Props>(function RichEdito
         [contenteditable] table { border-collapse: collapse; width: 100%; margin: .5em 0; }
         [contenteditable] td, [contenteditable] th { border: 1px solid var(--border); padding: 6px 10px; }
         [contenteditable] pre { background: var(--surface-2); padding: 10px 14px; border-radius: 6px; font-family: monospace; font-size: 12.5px; }
+        [contenteditable] img { max-width: 100%; height: auto; border-radius: 4px; display: inline-block; }
       `}</style>
     </div>
   );
