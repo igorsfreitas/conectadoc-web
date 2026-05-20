@@ -228,7 +228,10 @@ export function CaixaEntradaPage() {
                       />
                     </td>
                     <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                      <span style={{ color: "var(--brand-600, #2563eb)", fontWeight: 600, fontFamily: "JetBrains Mono, monospace", fontSize: 12.5, cursor: "pointer" }}>
+                      <span
+                        onClick={() => navigate(`/documentos/${item.documentoCodigo}`)}
+                        style={{ color: "var(--brand-600, #2563eb)", fontWeight: 600, fontFamily: "JetBrains Mono, monospace", fontSize: 12.5, cursor: "pointer" }}
+                      >
                         {item.numeroNetdoc ?? "—"}
                       </span>
                     </td>

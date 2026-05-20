@@ -5,6 +5,7 @@ import {
   CaixaTab,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
+  DocumentoDetalhe,
   TipoDocumentoSimples,
   UpdateDocumentoPayload,
   UpsertAtributosPayload,
@@ -28,6 +29,11 @@ export class DocumentosService {
     const res = await this.httpClient.get<CaixaResponse>(
       `/v1/documentos/caixa?${query.toString()}`,
     );
+    return res.data;
+  }
+
+  async findById(id: number): Promise<DocumentoDetalhe> {
+    const res = await this.httpClient.get<DocumentoDetalhe>(`/v1/documentos/${id}`);
     return res.data;
   }
 

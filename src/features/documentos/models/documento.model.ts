@@ -110,3 +110,52 @@ export interface CaixaResponse {
   segmentoSigla: string | null;
   segmentoNome: string | null;
 }
+
+export interface DocumentoDetalheAnexo {
+  id: number;
+  nome: string;
+  tamanho: string | null;
+  mime: string | null;
+  url: string | null;
+}
+
+export interface DocumentoDetalhePessoa {
+  codigo: number;
+  nome: string | null;
+  papel: string;
+}
+
+export interface DocumentoDetalhe {
+  codigo: number;
+  numeroNetdoc: string | null;
+  numero: string | null;
+  resumo: string | null;
+  despacho: string | null;
+  dataCriacao: string | null;
+  dataAtualizacao: string | null;
+  flagConfidencial: number | null;
+  flagFinalizado: number | null;
+  flagPendencia: number | null;
+
+  tipoDocumentoCodigo: number | null;
+  tipoDocumentoNome: string | null;
+  tipoDocumentoSigla: string | null;
+  tipoDocumentoBase: number | null;
+
+  assuntoCodigo: number | null;
+  assuntoDescricao: string | null;
+
+  segmentoOrigemSigla: string | null;
+  segmentoOrigemNome: string | null;
+  segmentoAtualSigla: string | null;
+  segmentoAtualNome: string | null;
+
+  usuarioCriadorCodigo: number | null;
+  usuarioCriadorNome: string | null;
+
+  dataRecebido: string | null;
+  tipoDespacho: string | null;
+
+  anexos: DocumentoDetalheAnexo[];
+  pessoas: DocumentoDetalhePessoa[];
+}
