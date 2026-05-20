@@ -64,7 +64,7 @@ export function Login() {
       }
       const profileRes = await profileService.getProfile();
       if (!(profileRes instanceof AfinzApiError)) setProfile(profileRes);
-      navigate(afinzAppPaths.assuntos.asRoute, { replace: true });
+      navigate(afinzAppPaths.inicio.asRoute!, { replace: true });
     } finally {
       setLoading(false);
     }

@@ -33,7 +33,7 @@ const IconHelp       = (p: { size?: number }) => <Icon {...p}><circle cx="12" cy
 // ── Nav definitions ───────────────────────────────────────────────────────
 const NAV_TRABALHO = [
   { path: afinzAppPaths.inicio.asRoute!,          label: 'Início',            Icon: IconHome     },
-  { path: afinzAppPaths.caixaEntrada.asRoute!,    label: 'Caixa de Entrada',  Icon: IconInbox    },
+  { path: afinzAppPaths.caixaEntrada.asRoute!,    label: 'Área de Trabalho',  Icon: IconInbox    },
   { path: afinzAppPaths.assinaturas.asRoute!,     label: 'Assinaturas',       Icon: IconPen      },
   { path: afinzAppPaths.documentos.asRoute!,      label: 'Documentos',        Icon: IconDocument },
   { path: afinzAppPaths.novoDocumento.asRoute!,   label: 'Novo documento',    Icon: IconPlus     },
@@ -231,7 +231,7 @@ function getBreadcrumb(pathname: string): string {
   if (pathname.startsWith('/documentos'))           return 'Documentos';
   if (pathname.startsWith('/assinaturas'))          return 'Assinaturas';
   if (pathname.startsWith('/pesquisa-avancada'))    return 'Pesquisa Avançada';
-  if (pathname.startsWith('/caixa'))                return 'Caixa de Entrada';
+  if (pathname.startsWith('/caixa'))                return 'Área de Trabalho';
   if (pathname.startsWith('/assuntos'))             return 'Assuntos';
   if (pathname.startsWith('/hierarquia'))           return 'Hierarquia';
   if (pathname.startsWith('/tipo-entidade-externa'))return 'Tipo de Entidade Externa';
