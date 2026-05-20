@@ -9,10 +9,12 @@ export interface Assunto {
   codigo: number;
   descricao?: string | null;
   anosPrescricao?: number | null;
+  flagGeral?: number | null;
   classificacao?: ItemArquivologia | null;
 }
 
 export interface AssuntoPayload {
   descricao: string;
   anosPrescricao?: number | null;
+  flagGeral?: number | null;
 }
