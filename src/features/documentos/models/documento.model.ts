@@ -119,6 +119,15 @@ export interface DocumentoDetalheAnexo {
   url: string | null;
 }
 
+export interface PecaDocumento {
+  codigo: number;
+  nome: string | null;
+  mimeType: string | null;
+  tamanhoBytes: number | null;
+  url: string | null;
+  dataCriacao: string | null;
+}
+
 export interface DocumentoDetalhePessoa {
   codigo: number;
   nome: string | null;

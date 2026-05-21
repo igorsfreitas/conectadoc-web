@@ -283,7 +283,46 @@ export function DocumentoDetalhePage() {
             </>
           )}
 
-          {activeTab !== 'overview' && (
+          {/* Aba Anexos */}
+          {activeTab === 'anexos' && (
+            <div className={s.card}>
+              <div className={s.cardHeader}>
+                <h3 className={s.cardTitle}>Peças e Anexos</h3>
+              </div>
+              {doc.anexos.length === 0 ? (
+                <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+                  Nenhum anexo neste documento.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {doc.anexos.map(a => (
+                    <div key={a.id} className={s.anexoItem}>
+                      <span className={s.pdfTag}>
+                        {(a.mime?.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4)}
+                      </span>
+                      <span className={s.anexoName}>{a.nome}</span>
+                      {a.tamanho && <span className={s.anexoSize}>{a.tamanho}</span>}
+                      {a.url ? (
+                        <a
+                          href={a.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={s.dlBtn}
+                          title="Baixar"
+                        >
+                          <Icon.dl />
+                        </a>
+                      ) : (
+                        <button className={s.dlBtn} disabled title="Baixar"><Icon.dl /></button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab !== 'overview' && activeTab !== 'anexos' && (
             <div className={s.card}>
               <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', margin: 0, padding: '40px 0' }}>
                 Conteúdo da aba <strong style={{ color: 'var(--text-2)' }}>{TABS.find(t => t.key === activeTab)?.label}</strong> em construção.

@@ -6,6 +6,7 @@ import {
   CreateDocumentoPayload,
   CreateDocumentoResponse,
   DocumentoDetalhe,
+  PecaDocumento,
   TipoDocumentoSimples,
   UpdateDocumentoPayload,
   UpsertAtributosPayload,
@@ -58,6 +59,22 @@ export class DocumentosService {
 
   async upsertAtributos(id: number, payload: UpsertAtributosPayload): Promise<AtributoDocumento[]> {
     const res = await this.httpClient.put<AtributoDocumento[]>(`/v1/documentos/${id}/atributos`, payload);
+    return res.data;
+  }
+
+  async listPecas(id: number): Promise<PecaDocumento[]> {
+    const res = await this.httpClient.get<PecaDocumento[]>(`/v1/documentos/${id}/pecas`);
+    return res.data;
+  }
+
+  async uploadPeca(id: number, file: File): Promise<PecaDocumento> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await this.httpClient.post<PecaDocumento>(
+      `/v1/documentos/${id}/pecas`,
+      form as any,
+    );
     return res.data;
   }
 }

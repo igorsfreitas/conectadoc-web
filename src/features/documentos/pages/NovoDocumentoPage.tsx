@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AtributoTipoDocumento } from "../../tipo-documento/models/tipo-documento.model";
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
-import { CreateDocumentoResponse, TipoDocumentoSimples } from "../models/documento.model";
+import { CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples } from "../models/documento.model";
 import { RichEditor } from "../../../infra/components/rich-editor";
 
 // ── Multi-valor splitter — legacy data uses several different separators ──
@@ -412,6 +412,12 @@ export function NovoDocumentoPage() {
   const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState<string | null>(null);
 
+  // Anexos (peças)
+  const [pecas,          setPecas]          = useState<PecaDocumento[]>([]);
+  const [uploadingPeca,  setUploadingPeca]   = useState(false);
+  const [showAnexos,     setShowAnexos]      = useState(false);
+  const fileInputRef                         = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (step === 2) {
       docService.findTiposInterno().then(setTipos).catch(() => {});
@@ -501,6 +507,19 @@ export function NovoDocumentoPage() {
     } catch (e: any) {
       setError(e?.response?.data?.message ?? "Erro ao salvar conteúdo.");
       setSaving(false);
+    }
+  }
+
+  async function handleUploadPeca(file: File) {
+    if (!createdDoc || uploadingPeca) return;
+    setUploadingPeca(true);
+    try {
+      const peca = await docService.uploadPeca(createdDoc.codigo, file);
+      setPecas(prev => [...prev, peca]);
+    } catch {
+      // silently ignore — user can retry
+    } finally {
+      setUploadingPeca(false);
     }
   }
 
@@ -845,8 +864,90 @@ export function NovoDocumentoPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
             <SidebarBtn icon="👁">Pré-visualizar</SidebarBtn>
             <SidebarBtn icon="👥">Co-autores (0)</SidebarBtn>
-            <SidebarBtn icon="📎">Anexos (0)</SidebarBtn>
+            <button
+              type="button"
+              onClick={() => setShowAnexos(p => !p)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                height: 36, padding: "0 12px",
+                background: showAnexos ? "oklch(0.94 0.04 250)" : "var(--surface-2, #f9fafb)",
+                border: `1px solid ${showAnexos ? "var(--brand-600, #2563eb)" : "var(--border, #e5e7eb)"}`,
+                borderRadius: 8, fontSize: 13,
+                color: showAnexos ? "var(--brand-600, #2563eb)" : "var(--text-2, #374151)",
+                cursor: "pointer", textAlign: "left",
+              }}
+            >
+              <span>📎</span>
+              <span>Anexos ({pecas.length})</span>
+            </button>
           </div>
+
+          {/* ── Anexos panel ───────────────────────────── */}
+          {showAnexos && (
+            <div style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: "none" }}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) { void handleUploadPeca(f); }
+                  e.target.value = "";
+                }}
+              />
+
+              {/* Existing pecas list */}
+              {pecas.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                  {pecas.map(p => (
+                    <div
+                      key={p.codigo}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        padding: "6px 10px",
+                        background: "var(--surface-2, #f9fafb)",
+                        border: "1px solid var(--border)", borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                    >
+                      <span style={{ fontSize: 14 }}>📄</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text, #111)" }}>
+                        {p.nome ?? `Anexo ${p.codigo}`}
+                      </span>
+                      {p.url && (
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Baixar"
+                          style={{ color: "var(--brand-600, #2563eb)", textDecoration: "none", flexShrink: 0 }}
+                        >
+                          ↓
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!createdDoc || uploadingPeca}
+                style={{
+                  width: "100%", padding: "8px 0",
+                  border: "1.5px dashed var(--border, #d1d5db)",
+                  borderRadius: 8, background: "transparent",
+                  fontSize: 12.5, color: "var(--text-2, #374151)",
+                  cursor: createdDoc && !uploadingPeca ? "pointer" : "not-allowed",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
+              >
+                {uploadingPeca ? "Enviando…" : "+ Adicionar arquivo"}
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* ── Right form card ───────────────────────────────────────── */}
