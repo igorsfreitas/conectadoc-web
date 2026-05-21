@@ -112,6 +112,7 @@ export function AppLayout() {
   const userName     = profile?.usuario?.nome ?? 'Usuário';
   const userInitials = initials(userName);
   const userCpf      = profile?.usuario?.cpf ? formatCpf(profile.usuario.cpf) : '';
+  const userFotoUrl  = profile?.usuario?.fotoUrl ?? null;
 
   async function handleLogout() {
     try { await authService.logout(); } catch { /* ignore */ }
@@ -131,7 +132,11 @@ export function AppLayout() {
 
         {/* Tenant switcher */}
         <div className="sidebar-tenant">
-          <div className="tenant-avatar">{userInitials}</div>
+          <div className="tenant-avatar">
+            {userFotoUrl
+              ? <img src={userFotoUrl} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+              : userInitials}
+          </div>
           <div className="tenant-info">
             <div className="tenant-name">Prefeitura Municipal</div>
             <div className="tenant-role">SEGOV · Gabinete</div>
@@ -146,7 +151,11 @@ export function AppLayout() {
 
         {/* Footer */}
         <div className="sidebar-footer">
-          <div className="user-avatar">{userInitials}</div>
+          <div className="user-avatar">
+            {userFotoUrl
+              ? <img src={userFotoUrl} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+              : userInitials}
+          </div>
           <div className="user-meta">
             <div className="user-name">{userName}</div>
             {userCpf && <div className="user-id">CPF {userCpf}</div>}

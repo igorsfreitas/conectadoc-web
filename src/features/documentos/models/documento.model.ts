@@ -139,6 +139,7 @@ export interface CoautorDocumento {
   codigoDocumento: number;
   codigoUsuario: number;
   nomeUsuario: string | null;
+  fotoUrl: string | null;
   papel: string;
   dataCriacao: string | null;
 }

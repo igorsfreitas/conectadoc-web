@@ -419,14 +419,22 @@ function CoautoresCard({
                 background: 'var(--surface-2)',
               }}
             >
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                background: '#a855f7',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 10, fontWeight: 700, color: '#fff',
-              }}>
-                {(c.nomeUsuario ?? '?').trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()}
-              </div>
+              {c.fotoUrl ? (
+                <img
+                  src={c.fotoUrl}
+                  alt={c.nomeUsuario ?? ''}
+                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                />
+              ) : (
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: '#a855f7',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontWeight: 700, color: '#fff',
+                }}>
+                  {(c.nomeUsuario ?? '?').trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+              )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {c.nomeUsuario ?? `Usuário #${c.codigoUsuario}`}
