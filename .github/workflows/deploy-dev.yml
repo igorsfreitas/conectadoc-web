@@ -11,6 +11,8 @@ jobs:
   build:
     name: Build web
     runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.version.outputs.release_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -20,6 +22,16 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+
+      - name: Resolve release version
+        id: version
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          RELEASE_VERSION="${PACKAGE_VERSION}+${SHORT_SHA}"
+          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$RELEASE_VERSION" >> "$GITHUB_ENV"
 
       - name: Setup Bitbucket SSH access
         env:
@@ -58,6 +70,20 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Write version metadata
+        run: |
+          set -euo pipefail
+          BUILT_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          cat > dist/version.json <<EOF
+          {
+            "name": "conectadoc-web",
+            "version": "$APP_VERSION",
+            "commit": "$GITHUB_SHA",
+            "builtAt": "$BUILT_AT",
+            "runId": "$GITHUB_RUN_ID"
+          }
+          EOF
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v6
         with:
@@ -81,6 +107,7 @@ jobs:
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
       DEPLOY_BASE_PATH: ${{ secrets.DEPLOY_BASE_PATH || '/opt/conectadoc' }}
       RELEASE_ID: ${{ github.sha }}
+      RELEASE_VERSION: ${{ needs.build.outputs.release_version }}
       DOCKER_NETWORK: conectadoc_internal
     steps:
       - name: Download dist artifact
@@ -130,3 +157,49 @@ jobs:
           set -euo pipefail
           ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"
+
+      - name: Notify WhatsApp new version
+        continue-on-error: true
+        env:
+          WHATSAPP_API_URL: ${{ secrets.WHATSAPP_API_URL }}
+          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
+          WHATSAPP_INSTANCE: ${{ secrets.WHATSAPP_INSTANCE }}
+          WHATSAPP_RECIPIENTS: "+5581988145555,+5581981154380"
+          PUBLIC_URL: ${{ vars.PUBLIC_URL || format('http://{0}', secrets.DEPLOY_SSH_HOST) }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${WHATSAPP_API_URL:-}" ] || [ -z "${WHATSAPP_API_KEY:-}" ] || [ -z "${WHATSAPP_INSTANCE:-}" ]; then
+            echo "WhatsApp notification skipped: configure WHATSAPP_API_URL, WHATSAPP_API_KEY and WHATSAPP_INSTANCE."
+            exit 0
+          fi
+
+          API_URL="${WHATSAPP_API_URL%/}"
+          ENDPOINT="$API_URL/message/sendText/$WHATSAPP_INSTANCE"
+          MESSAGE="Nova versão do ConectaDoc Web publicada em DEV.
+          Versão: $RELEASE_VERSION
+          Commit: ${GITHUB_SHA::7}
+          URL: $PUBLIC_URL"
+
+          FAILED=0
+          IFS=',' read -ra RECIPIENTS <<< "$WHATSAPP_RECIPIENTS"
+          for RAW_NUMBER in "${RECIPIENTS[@]}"; do
+            NUMBER="$(printf '%s' "$RAW_NUMBER" | tr -cd '0-9')"
+            if [ -z "$NUMBER" ]; then
+              continue
+            fi
+
+            PAYLOAD="$(NUMBER="$NUMBER" MESSAGE="$MESSAGE" node -e 'console.log(JSON.stringify({ number: process.env.NUMBER, text: process.env.MESSAGE }))')"
+            if curl --fail --show-error --silent \
+              -X POST "$ENDPOINT" \
+              -H "Content-Type: application/json" \
+              -H "apikey: $WHATSAPP_API_KEY" \
+              --data "$PAYLOAD" > /dev/null; then
+              echo "WhatsApp notification sent to $NUMBER"
+            else
+              echo "::warning::Failed to send WhatsApp notification to $NUMBER"
+              FAILED=1
+            fi
+          done
+
+          exit "$FAILED"

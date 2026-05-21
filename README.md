@@ -100,6 +100,15 @@ Cadastre em `Settings > Secrets and variables > Actions > Secrets`:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` | Diretorio base criado pela infra |
 | `WEB_ENV_FILE` | conteudo do `.env.production` | Variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada Bitbucket | Acesso de leitura aos pacotes privados `@afinz/*` |
+| `WHATSAPP_API_URL` | `https://wpp.seu-dominio.com` | URL base da API de WhatsApp compativel com Evolution API e acessivel pelo GitHub Actions |
+| `WHATSAPP_API_KEY` | token da API | Chave usada para enviar mensagens |
+| `WHATSAPP_INSTANCE` | `conectadoc` | Instancia/sessao de WhatsApp usada para envio |
+
+Tambem configure em `Settings > Secrets and variables > Actions > Variables`:
+
+| Variable | Exemplo | Descricao |
+| --- | --- | --- |
+| `PUBLIC_URL` | `http://187.77.7.7` | URL enviada na mensagem de nova versao |
 
 Base atual do `WEB_ENV_FILE` para DEV:
 
@@ -107,6 +116,8 @@ Base atual do `WEB_ENV_FILE` para DEV:
 VITE_APP_BASE_URL=/api
 VITE_APP_OPEN_SEARCH_URL=
 ```
+
+O envio de WhatsApp acontece depois que o container `conectadoc-web` fica saudavel. Por padrao, a mensagem e enviada para `+5581988145555` e `+5581981154380`. Se os secrets `WHATSAPP_API_URL`, `WHATSAPP_API_KEY` e `WHATSAPP_INSTANCE` nao estiverem configurados, o deploy continua e a notificacao e ignorada. Se a API de WhatsApp ficar privada na maquina DEV, exponha-a via reverse proxy/firewall somente para o necessario ou adapte o passo para executar o `curl` via SSH.
 
 ### Como executar
 
@@ -129,6 +140,27 @@ VITE_APP_OPEN_SEARCH_URL=
 - executa `docker compose -f docker-compose.deploy.yml build`;
 - executa `docker compose -f docker-compose.deploy.yml up -d --remove-orphans`;
 - valida o health check do container `conectadoc-web`.
+- envia uma mensagem de WhatsApp avisando a nova versao publicada, quando os secrets de WhatsApp estiverem configurados.
+
+### Versao publicada
+
+A pipeline gera a versao no formato:
+
+```txt
+<version-do-package.json>+<sha-curto>
+```
+
+Exemplo:
+
+```txt
+1.0.0-rc+a1b2c3d
+```
+
+Essa versao aparece no rodape da sidebar do sistema e tambem fica disponivel em:
+
+```txt
+/version.json
+```
 
 ### Validacao pos-deploy
 

@@ -107,12 +107,23 @@ Cadastre:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` |
 | `WEB_ENV_FILE` | variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada com acesso aos pacotes `@afinz/*` |
+| `WHATSAPP_API_URL` | URL base da API de WhatsApp compativel com Evolution API e acessivel pelo GitHub Actions |
+| `WHATSAPP_API_KEY` | chave/token da API de WhatsApp |
+| `WHATSAPP_INSTANCE` | instancia/sessao usada para envio |
 
 Para copiar a chave privada de deploy:
 
 ```bash
 cat ~/.ssh/conectadoc_github_actions
 ```
+
+Em `Settings > Secrets and variables > Actions > Variables`, cadastre tambem:
+
+| Variable | Valor |
+| --- | --- |
+| `PUBLIC_URL` | URL publica do frontend, por exemplo `http://187.77.7.7` |
+
+O workflow envia aviso de nova versao para `+5581988145555` e `+5581981154380` depois que o container do Web fica saudavel. Se os secrets de WhatsApp nao estiverem configurados, o deploy nao falha; apenas registra que a notificacao foi ignorada. Se a API de WhatsApp ficar privada na maquina DEV, exponha-a via reverse proxy/firewall somente para o necessario ou adapte o passo para executar o `curl` via SSH.
 
 ## 4. Configurar WEB_ENV_FILE
 
@@ -150,6 +161,14 @@ Selecione a branch `main`.
 
 O workflow e manual. Push em `main` nao dispara deploy automatico.
 
+Ao final do deploy, a pipeline publica uma versao no formato:
+
+```txt
+<version-do-package.json>+<sha-curto>
+```
+
+Essa versao aparece no rodape da sidebar e fica disponivel em `/version.json`.
+
 ## 7. Validar deploy
 
 Na maquina DEV:
@@ -169,6 +188,7 @@ Pela URL publica:
 ```bash
 curl -i http://187.77.7.7/healthz
 curl -i http://187.77.7.7/
+curl -i http://187.77.7.7/version.json
 ```
 
 ## 8. Troubleshooting rapido

@@ -285,6 +285,14 @@ a:hover { text-decoration: underline; }
 .user-meta { flex: 1; min-width: 0; }
 .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-id { font-size: 11.5px; color: var(--text-3); }
+.app-version {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .icon-btn {
   width: 30px; height: 30px;

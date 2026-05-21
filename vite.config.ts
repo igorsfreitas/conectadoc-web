@@ -5,7 +5,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  define: { APP_VERSION: JSON.stringify(process.env.npm_package_version) },
+  define: {
+    APP_VERSION: JSON.stringify(
+      process.env.APP_VERSION ?? process.env.npm_package_version ?? "dev",
+    ),
+  },
   server: {
     port: 5173,
     https: {

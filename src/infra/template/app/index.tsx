@@ -147,6 +147,7 @@ export function AppLayout() {
   const userInitials = initials(userName);
   const userCpf      = profile?.usuario?.cpf ? formatCpf(profile.usuario.cpf) : '';
   const userFotoUrl  = profile?.usuario?.fotoUrl ?? null;
+  const appVersion   = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'dev';
 
   async function handleLogout() {
     try { await authService.logout(); } catch { /* ignore */ }
@@ -189,6 +190,7 @@ export function AppLayout() {
           <div className="user-meta">
             <div className="user-name">{userName}</div>
             {userCpf && <div className="user-id">CPF {userCpf}</div>}
+            <div className="app-version" title={`Versão ${appVersion}`}>v{appVersion}</div>
           </div>
           <button className="icon-btn" title="Sair" onClick={handleLogout}>
             <IconLogout size={16} />
