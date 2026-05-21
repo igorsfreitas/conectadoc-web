@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
 import type { DocumentosService } from '../../../../infra/services/documentos/documentos.service';
-import type { AtributoDocumento, CoautorDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
+import type { AtributoDocumento, CoautorDocumento, ComentarioDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
 import type { AtributoTipoDocumento } from '../../../tipo-documento/models/tipo-documento.model';
 import s from './style.module.scss';
 
@@ -507,6 +507,152 @@ function CoautoresCard({
   );
 }
 
+// ── ComentariosTab ─────────────────────────────────────────────────────────
+
+function ComentariosTab({ docId, service }: { docId: number; service: DocumentosService }) {
+  const [comentarios, setComentarios] = useState<ComentarioDocumento[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [texto, setTexto]             = useState('');
+  const [sending, setSending]         = useState(false);
+  const [removing, setRemoving]       = useState<number | null>(null);
+  const textareaRef                   = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    service.listComentarios(docId)
+      .then(setComentarios)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [docId]);
+
+  async function handleSend() {
+    const t = texto.trim();
+    if (!t || sending) return;
+    setSending(true);
+    try {
+      const novo = await service.addComentario(docId, t);
+      setComentarios(prev => [...prev, novo]);
+      setTexto('');
+      textareaRef.current?.focus();
+    } catch { /* ignore */ }
+    finally { setSending(false); }
+  }
+
+  async function handleDelete(c: ComentarioDocumento) {
+    if (removing !== null) return;
+    setRemoving(c.codigo);
+    try {
+      await service.deleteComentario(docId, c.codigo);
+      setComentarios(prev => prev.filter(x => x.codigo !== c.codigo));
+    } catch { /* ignore */ }
+    finally { setRemoving(null); }
+  }
+
+  function fmtRelativo(iso: string | null): string {
+    if (!iso) return '';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)   return 'agora mesmo';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min atrás`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' });
+  }
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex', gap: 10, padding: '12px 0',
+    borderBottom: '1px solid var(--border)',
+  };
+
+  return (
+    <div className={s.card}>
+      <div className={s.cardHeader}>
+        <h3 className={s.cardTitle}>Comentários</h3>
+        {comentarios.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{comentarios.length}</span>
+        )}
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>Carregando…</p>
+      ) : comentarios.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 16px' }}>
+          Nenhum comentário ainda. Seja o primeiro a comentar.
+        </p>
+      ) : (
+        <div style={{ marginBottom: 20 }}>
+          {comentarios.map(c => (
+            <div key={c.codigo} style={rowStyle}>
+              {/* Avatar */}
+              {c.fotoUrl ? (
+                <img src={c.fotoUrl} alt={c.nomeUsuario ?? ''} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }} />
+              ) : (
+                <div style={{
+                  width: 34, height: 34, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                  background: avatarColor(c.codigoUsuario),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: '#fff',
+                }}>
+                  {initials(c.nomeUsuario)}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                    {c.nomeUsuario ?? `Usuário #${c.codigoUsuario}`}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>{fmtRelativo(c.dataCriacao)}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {c.texto}
+                </p>
+              </div>
+              <button
+                className={s.iconBtn}
+                title="Excluir comentário"
+                onClick={() => handleDelete(c)}
+                disabled={removing === c.codigo}
+                style={{ alignSelf: 'flex-start', marginTop: 2, color: 'var(--text-3)', flexShrink: 0 }}
+              >
+                <Icon.close />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Caixa de envio */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <textarea
+          ref={textareaRef}
+          value={texto}
+          onChange={e => setTexto(e.target.value)}
+          onKeyDown={e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSend();
+          }}
+          placeholder="Escreva um comentário… (Ctrl+↵ para enviar)"
+          rows={3}
+          style={{
+            flex: 1, resize: 'vertical', minHeight: 72, padding: '10px 12px',
+            border: '1px solid var(--border)', borderRadius: 10,
+            fontSize: 13.5, fontFamily: 'inherit', color: 'var(--text)',
+            background: 'var(--surface-2)', outline: 'none',
+            transition: 'border-color 0.15s',
+          }}
+          onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+          onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+        />
+        <button
+          className={s.btnPrimary}
+          onClick={handleSend}
+          disabled={!texto.trim() || sending}
+          style={{ height: 38, paddingInline: 18, flexShrink: 0, alignSelf: 'flex-end' }}
+        >
+          {sending ? 'Enviando…' : 'Comentar'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IconPlus() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -807,7 +953,11 @@ export function DocumentoDetalhePage() {
             </div>
           )}
 
-          {activeTab !== 'overview' && activeTab !== 'anexos' && (
+          {activeTab === 'comments' && (
+            <ComentariosTab docId={doc.codigo} service={service} />
+          )}
+
+          {activeTab !== 'overview' && activeTab !== 'anexos' && activeTab !== 'comments' && (
             <div className={s.card}>
               <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', margin: 0, padding: '40px 0' }}>
                 Conteúdo da aba <strong style={{ color: 'var(--text-2)' }}>{TABS.find(t => t.key === activeTab)?.label}</strong> em construção.

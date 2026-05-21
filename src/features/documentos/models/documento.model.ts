@@ -151,6 +151,16 @@ export interface UsuarioSearchItem {
   matricula: string | null;
 }
 
+export interface ComentarioDocumento {
+  codigo: number;
+  codigoDocumento: number;
+  codigoUsuario: number;
+  nomeUsuario: string | null;
+  fotoUrl: string | null;
+  texto: string;
+  dataCriacao: string | null;
+}
+
 export interface DocumentoDetalhe {
   codigo: number;
   numeroNetdoc: string | null;

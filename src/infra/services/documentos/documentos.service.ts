@@ -4,6 +4,7 @@ import {
   CaixaResponse,
   CaixaTab,
   CoautorDocumento,
+  ComentarioDocumento,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
   DocumentoDetalhe,
@@ -105,5 +106,21 @@ export class DocumentosService {
       { params: { q, limit: 10 } },
     );
     return res.data;
+  }
+
+  // ── Comentários ─────────────────────────────────────────────────────────────
+
+  async listComentarios(id: number): Promise<ComentarioDocumento[]> {
+    const res = await this.httpClient.get<ComentarioDocumento[]>(`/v1/documentos/${id}/comentarios`);
+    return res.data;
+  }
+
+  async addComentario(id: number, texto: string): Promise<ComentarioDocumento> {
+    const res = await this.httpClient.post<ComentarioDocumento>(`/v1/documentos/${id}/comentarios`, { texto });
+    return res.data;
+  }
+
+  async deleteComentario(id: number, comentarioId: number): Promise<void> {
+    await this.httpClient.delete(`/v1/documentos/${id}/comentarios/${comentarioId}`);
   }
 }
