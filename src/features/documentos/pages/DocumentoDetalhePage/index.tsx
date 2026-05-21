@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
-import type { DocumentoDetalhe, DocumentoDetalheAnexo } from '../../models/documento.model';
+import type { CoautorDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
 import s from './style.module.scss';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -249,6 +249,216 @@ function Avatar({ name, codigo }: { name: string | null; codigo: number }) {
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
+
+// ── CoautoresCard ──────────────────────────────────────────────────────────
+
+function CoautoresCard({
+  docId,
+  service,
+}: {
+  docId: number;
+  service: ReturnType<typeof useInject>;
+}) {
+  const [coautores, setCoautores]       = useState<CoautorDocumento[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [adding, setAdding]             = useState(false);
+  const [searchQ, setSearchQ]           = useState('');
+  const [searchRes, setSearchRes]       = useState<UsuarioSearchItem[]>([]);
+  const [searching, setSearching]       = useState(false);
+  const [removing, setRemoving]         = useState<number | null>(null);
+  const [showSearch, setShowSearch]     = useState(false);
+  const searchRef                        = useRef<HTMLInputElement>(null);
+  const debounceRef                      = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    service.listCoautores(docId).then(setCoautores).catch(() => {}).finally(() => setLoading(false));
+  }, [docId]);
+
+  useEffect(() => {
+    if (showSearch) setTimeout(() => searchRef.current?.focus(), 50);
+  }, [showSearch]);
+
+  function handleSearchChange(q: string) {
+    setSearchQ(q);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.trim().length < 2) { setSearchRes([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await service.searchUsuarios(q.trim());
+        setSearchRes(res);
+      } catch { setSearchRes([]); }
+      finally { setSearching(false); }
+    }, 300);
+  }
+
+  async function handleAdd(user: UsuarioSearchItem) {
+    if (adding) return;
+    setAdding(true);
+    try {
+      const novo = await service.addCoautor(docId, user.codigo);
+      setCoautores(prev => {
+        const already = prev.find(c => c.codigoUsuario === user.codigo);
+        return already ? prev : [...prev, novo];
+      });
+    } catch { /* ignore */ }
+    finally {
+      setAdding(false);
+      setShowSearch(false);
+      setSearchQ('');
+      setSearchRes([]);
+    }
+  }
+
+  async function handleRemove(coautor: CoautorDocumento) {
+    if (removing !== null) return;
+    setRemoving(coautor.codigoUsuario);
+    try {
+      await service.removeCoautor(docId, coautor.codigoUsuario);
+      setCoautores(prev => prev.filter(c => c.codigoUsuario !== coautor.codigoUsuario));
+    } catch { /* ignore */ }
+    finally { setRemoving(null); }
+  }
+
+  return (
+    <div className={s.sideCard}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <p className={s.sideLabel} style={{ margin: 0 }}>Co-autores</p>
+        <button
+          className={s.iconBtn}
+          title="Adicionar co-autor"
+          onClick={() => setShowSearch(v => !v)}
+          style={{ color: showSearch ? 'var(--primary)' : undefined }}
+        >
+          {showSearch ? <Icon.close /> : <IconPlus />}
+        </button>
+      </div>
+
+      {/* Search box */}
+      {showSearch && (
+        <div style={{ marginBottom: 10, position: 'relative' }}>
+          <input
+            ref={searchRef}
+            type="text"
+            value={searchQ}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Buscar por nome, CPF ou matrícula..."
+            style={{
+              width: '100%', boxSizing: 'border-box', height: 36,
+              padding: '0 10px', fontSize: 12.5,
+              border: '1px solid var(--border)', borderRadius: 8,
+              outline: 'none', fontFamily: 'inherit',
+              color: 'var(--text)', background: 'var(--surface-2)',
+            }}
+            onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+            onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+          />
+          {(searching || searchRes.length > 0) && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.1)',
+              marginTop: 4, overflow: 'hidden',
+            }}>
+              {searching && (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>Buscando…</div>
+              )}
+              {!searching && searchRes.length === 0 && searchQ.trim().length >= 2 && (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)' }}>Nenhum usuário encontrado.</div>
+              )}
+              {searchRes.map(u => {
+                const alreadyAdded = coautores.some(c => c.codigoUsuario === u.codigo);
+                return (
+                  <button
+                    key={u.codigo}
+                    type="button"
+                    onClick={() => !alreadyAdded && handleAdd(u)}
+                    disabled={alreadyAdded || adding}
+                    style={{
+                      display: 'flex', flexDirection: 'column', width: '100%',
+                      padding: '8px 12px', background: 'none', border: 'none',
+                      borderBottom: '1px solid var(--border)',
+                      textAlign: 'left', cursor: alreadyAdded ? 'default' : 'pointer',
+                      opacity: alreadyAdded ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => { if (!alreadyAdded) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                      {u.nome ?? `Usuário #${u.codigo}`}
+                      {alreadyAdded && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 6 }}>já adicionado</span>}
+                    </span>
+                    {(u.cpf || u.matricula) && (
+                      <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>
+                        {[u.cpf, u.matricula].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Co-authors list */}
+      {loading ? (
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>Carregando…</p>
+      ) : coautores.length === 0 ? (
+        <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+          Nenhum co-autor cadastrado.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {coautores.map(c => (
+            <div
+              key={c.codigoUsuario}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 8px', borderRadius: 8,
+                background: 'var(--surface-2)',
+              }}
+            >
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                background: '#a855f7',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, fontWeight: 700, color: '#fff',
+              }}>
+                {(c.nomeUsuario ?? '?').trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.nomeUsuario ?? `Usuário #${c.codigoUsuario}`}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.2 }}>{c.papel}</div>
+              </div>
+              <button
+                className={s.iconBtn}
+                title="Remover co-autor"
+                onClick={() => handleRemove(c)}
+                disabled={removing === c.codigoUsuario}
+                style={{ width: 24, height: 24, color: 'var(--text-3)', flexShrink: 0 }}
+              >
+                <Icon.close />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export function DocumentoDetalhePage() {
   const { codigo } = useParams();
@@ -569,6 +779,9 @@ export function DocumentoDetalhePage() {
               ))
             )}
           </div>
+
+          {/* Co-autores */}
+          <CoautoresCard docId={doc.codigo} service={service} />
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ import {
   AtributoDocumento,
   CaixaResponse,
   CaixaTab,
+  CoautorDocumento,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
   DocumentoDetalhe,
@@ -10,6 +11,7 @@ import {
   TipoDocumentoSimples,
   UpdateDocumentoPayload,
   UpsertAtributosPayload,
+  UsuarioSearchItem,
 } from '../../../features/documentos/models/documento.model';
 
 export class DocumentosService {
@@ -74,6 +76,33 @@ export class DocumentosService {
     const res = await this.httpClient.post<PecaDocumento>(
       `/v1/documentos/${id}/pecas`,
       form as any,
+    );
+    return res.data;
+  }
+
+  // ── Co-autores ─────────────────────────────────────────────────────────────
+
+  async listCoautores(id: number): Promise<CoautorDocumento[]> {
+    const res = await this.httpClient.get<CoautorDocumento[]>(`/v1/documentos/${id}/coautores`);
+    return res.data;
+  }
+
+  async addCoautor(id: number, codigoUsuario: number, papel?: string): Promise<CoautorDocumento> {
+    const res = await this.httpClient.post<CoautorDocumento>(`/v1/documentos/${id}/coautores`, {
+      codigoUsuario,
+      papel,
+    });
+    return res.data;
+  }
+
+  async removeCoautor(id: number, usuarioId: number): Promise<void> {
+    await this.httpClient.delete(`/v1/documentos/${id}/coautores/${usuarioId}`);
+  }
+
+  async searchUsuarios(q: string): Promise<UsuarioSearchItem[]> {
+    const res = await this.httpClient.get<UsuarioSearchItem[]>(
+      `/v1/documentos/usuarios/search`,
+      { params: { q, limit: 10 } },
     );
     return res.data;
   }

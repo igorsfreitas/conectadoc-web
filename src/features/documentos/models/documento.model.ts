@@ -134,6 +134,22 @@ export interface DocumentoDetalhePessoa {
   papel: string;
 }
 
+export interface CoautorDocumento {
+  codigo: number;
+  codigoDocumento: number;
+  codigoUsuario: number;
+  nomeUsuario: string | null;
+  papel: string;
+  dataCriacao: string | null;
+}
+
+export interface UsuarioSearchItem {
+  codigo: number;
+  nome: string | null;
+  cpf: string | null;
+  matricula: string | null;
+}
+
 export interface DocumentoDetalhe {
   codigo: number;
   numeroNetdoc: string | null;
