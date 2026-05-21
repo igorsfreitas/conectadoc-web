@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ProfileContext } from "../../contexts/profile";
 import { useInject } from "../../hooks/inject";
@@ -106,6 +106,40 @@ export function AppLayout() {
   const { profile, setProfile } = useContext(ProfileContext);
   const authService = useInject("AuthService");
 
+  const searchRef = useRef<HTMLInputElement>(null);
+  const isCaixaPage = location.pathname === afinzAppPaths.caixaEntrada.asRoute;
+  const urlQ = new URLSearchParams(location.search).get('q') ?? '';
+  const [topInput, setTopInput] = useState(urlQ);
+
+  // Keep topInput in sync when URL changes (e.g. local bar in CaixaEntradaPage)
+  useEffect(() => { setTopInput(urlQ); }, [urlQ]);
+
+  // Cmd+K / Ctrl+K: focus top search bar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        if (!isCaixaPage) navigate(afinzAppPaths.caixaEntrada.asRoute!);
+        setTimeout(() => searchRef.current?.focus(), 60);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isCaixaPage, navigate]);
+
+  function handleTopKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      const q = topInput.trim();
+      navigate(`${afinzAppPaths.caixaEntrada.asRoute!}${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+      e.currentTarget.blur();
+    }
+    if (e.key === 'Escape') {
+      setTopInput('');
+      navigate(afinzAppPaths.caixaEntrada.asRoute!);
+      e.currentTarget.blur();
+    }
+  }
+
   const initials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
@@ -132,11 +166,7 @@ export function AppLayout() {
 
         {/* Tenant switcher */}
         <div className="sidebar-tenant">
-          <div className="tenant-avatar">
-            {userFotoUrl
-              ? <img src={userFotoUrl} alt={userName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
-              : userInitials}
-          </div>
+          <div className="tenant-avatar">{userInitials}</div>
           <div className="tenant-info">
             <div className="tenant-name">Prefeitura Municipal</div>
             <div className="tenant-role">SEGOV · Gabinete</div>
@@ -195,10 +225,13 @@ export function AppLayout() {
               <IconSearch size={14} />
             </span>
             <input
+              ref={searchRef}
               className="input"
               style={{ paddingLeft: 32, paddingRight: 52, height: 36, fontSize: 13 }}
-              placeholder="Buscar por NetDoc, processo, assunto, pessoa…"
-              readOnly
+              placeholder="Buscar por número NetDoc… (↵ para pesquisar)"
+              value={topInput}
+              onChange={e => setTopInput(e.target.value)}
+              onKeyDown={handleTopKeyDown}
             />
             <kbd style={{
               position: 'absolute',

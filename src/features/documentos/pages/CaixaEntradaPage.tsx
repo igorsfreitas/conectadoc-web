@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CaixaItem, CaixaResponse, CaixaCounts, CaixaTab } from "../models/documento.model";
@@ -32,10 +32,14 @@ const TABS: { key: CaixaTab; label: string }[] = [
 export function CaixaEntradaPage() {
   const navigate = useNavigate();
   const service = useInject("DocumentosService");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL is the source of truth for search — both bars write here
+  const urlQ = searchParams.get("q") ?? "";
 
   const [tab, setTab] = useState<CaixaTab>("entrada");
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState(urlQ);
+  const [searchInput, setSearchInput] = useState(urlQ);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<CaixaItem[]>([]);
   const [counts, setCounts] = useState<CaixaCounts>({ entrada: 0, saida: 0, posse: 0, pendencia: 0, circular: 0, gerencia: 0 });
@@ -60,12 +64,25 @@ export function CaixaEntradaPage() {
     finally { setLoading(false); }
   }, [service]);
 
+  // Sync local state when topbar updates the URL param
+  useEffect(() => {
+    if (urlQ !== search) {
+      setSearch(urlQ);
+      setSearchInput(urlQ);
+      setPage(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQ]);
+
   useEffect(() => { load(tab, page, search); }, [tab, page, search, load]);
 
   function handleTabChange(t: CaixaTab) {
     setTab(t);
     setPage(1);
     setSelected(new Set());
+    setSearch("");
+    setSearchInput("");
+    setSearchParams({}, { replace: true });
   }
 
   function handleSearchInput(v: string) {
@@ -74,6 +91,8 @@ export function CaixaEntradaPage() {
     searchDebounce.current = setTimeout(() => {
       setSearch(v);
       setPage(1);
+      // Sync URL so topbar also reflects the search
+      setSearchParams(v.trim() ? { q: v.trim() } : {}, { replace: true });
     }, 400);
   }
 
@@ -318,33 +337,58 @@ export function CaixaEntradaPage() {
         </div>
 
         {/* ── Pagination ── */}
-        {meta.totalPages > 1 && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "10px 16px", borderTop: "1px solid var(--border, #e5e7eb)",
-            fontSize: 13, color: "var(--text-2, #374151)",
-          }}>
-            <span>Página {meta.page} de {meta.totalPages}</span>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 12, height: 30, padding: "0 12px" }}
-                disabled={meta.page <= 1}
-                onClick={() => setPage(p => p - 1)}
-              >
-                ‹ Anterior
-              </button>
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 12, height: 30, padding: "0 12px" }}
-                disabled={meta.page >= meta.totalPages}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Próxima ›
-              </button>
-            </div>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 16px", borderTop: "1px solid var(--border, #e5e7eb)",
+          fontSize: 13, color: "var(--text-2, #374151)",
+        }}>
+          <span style={{ color: "var(--text-3)", fontSize: 12 }}>
+            {meta.total === 0
+              ? "Nenhum documento"
+              : `${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} de ${meta.total}`}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, height: 30, padding: "0 10px" }}
+              disabled={meta.page <= 1 || loading}
+              onClick={() => setPage(1)}
+            >
+              «
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, height: 30, padding: "0 12px" }}
+              disabled={meta.page <= 1 || loading}
+              onClick={() => setPage(p => p - 1)}
+            >
+              ‹ Anterior
+            </button>
+            <span style={{
+              fontSize: 12, padding: "0 10px", height: 30,
+              display: "flex", alignItems: "center", gap: 4,
+              fontVariantNumeric: "tabular-nums",
+            }}>
+              Página <strong>{meta.page}</strong> de <strong>{meta.totalPages}</strong>
+            </span>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, height: 30, padding: "0 12px" }}
+              disabled={meta.page >= meta.totalPages || loading}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Próxima ›
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, height: 30, padding: "0 10px" }}
+              disabled={meta.page >= meta.totalPages || loading}
+              onClick={() => setPage(meta.totalPages)}
+            >
+              »
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

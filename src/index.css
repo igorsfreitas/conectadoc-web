@@ -272,8 +272,9 @@ a:hover { text-decoration: underline; }
   gap: 10px;
 }
 .user-avatar {
-  width: 32px; height: 32px;
+  width: 36px; height: 36px;
   border-radius: 50%;
+  overflow: hidden;
   background: linear-gradient(135deg, oklch(0.7 0.12 30), oklch(0.55 0.15 350));
   color: white;
   display: grid; place-items: center;
