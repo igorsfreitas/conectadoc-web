@@ -70,11 +70,6 @@ function formatAtributoDisplay(atipo: AtributoTipoDocumento, adoc: AtributoDocum
   }
   // Checkbox
   if (t === 11) return raw === '1' ? 'Sim' : 'Não';
-  // Strip HTML
-  if (t === 7) {
-    const plain = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return plain || '—';
-  }
   // Multi-valued: split and join
   if (t === 8) {
     const parts = raw.includes('|') ? raw.split('|')
@@ -865,6 +860,27 @@ export function DocumentoDetalhePage() {
                       )}
                       {items.map(atipo => {
                         const adoc = atributosDoc.find(a => a.codigoAtributoTipo === atipo.codigo);
+                        const isHtml = atipo.tipo === 7;
+                        const rawVal = extractAtributoVal(atipo, adoc);
+
+                        if (isHtml) {
+                          return (
+                            <div key={atipo.codigo} className={s.htmlField}>
+                              <span className={s.htmlFieldLabel}>
+                                {atipo.label ?? atipo.nome ?? `Campo ${atipo.codigo}`}
+                              </span>
+                              {rawVal ? (
+                                <div
+                                  className={s.htmlContent}
+                                  dangerouslySetInnerHTML={{ __html: rawVal }}
+                                />
+                              ) : (
+                                <span style={{ fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic' }}>—</span>
+                              )}
+                            </div>
+                          );
+                        }
+
                         const val = formatAtributoDisplay(atipo, adoc);
                         return (
                           <div key={atipo.codigo} className={s.detailRow}
