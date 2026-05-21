@@ -656,6 +656,159 @@ function IconPlus() {
   );
 }
 
+// ── DocumentoPreview ────────────────────────────────────────────────────────
+
+function DocumentoPreview({
+  doc,
+  atributosTipo,
+  atributosDoc,
+}: {
+  doc: DocumentoDetalhe;
+  atributosTipo: AtributoTipoDocumento[];
+  atributosDoc: AtributoDocumento[];
+}) {
+  const dataCriacao = doc.dataCriacao ? new Date(doc.dataCriacao) : null;
+  const dataFormatada = dataCriacao
+    ? dataCriacao.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    : null;
+
+  const tipoNome = doc.tipoDocumentoNome?.toUpperCase() ?? '';
+  const docTitulo = [tipoNome, doc.numero ? `Nº ${doc.numero}` : null].filter(Boolean).join(' ');
+
+  const getAdoc = (atipo: AtributoTipoDocumento) =>
+    atributosDoc.find(a => a.codigoAtributoTipo === atipo.codigo);
+
+  const getVal = (atipo: AtributoTipoDocumento) => extractAtributoVal(atipo, getAdoc(atipo));
+
+  // Split by tipo: HTML fields get their own full-width block; others inline
+  const atributoSimples = atributosTipo.filter(a => a.tipo !== 7);
+  const atributoHtml    = atributosTipo.filter(a => a.tipo === 7);
+
+  const paper: React.CSSProperties = {
+    background: '#fff',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    boxShadow: '0 4px 24px rgba(15,23,42,0.10)',
+    maxWidth: 700,
+    margin: '0 auto',
+    fontFamily: "'Times New Roman', Georgia, serif",
+    fontSize: 13,
+    color: '#111',
+    lineHeight: 1.7,
+  };
+
+  const body: React.CSSProperties = { padding: '44px 64px 56px' };
+
+  return (
+    <div style={paper}>
+      <div style={body}>
+
+        {/* ── Institutional header ─────────────────────────── */}
+        <div style={{ textAlign: 'center', marginBottom: 22 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'inherit', color: '#333' }}>
+            Prefeitura Municipal
+          </div>
+
+          {/* Coat-of-arms placeholder — replaces with real image when available */}
+          <div style={{
+            height: 70,
+            background: 'repeating-linear-gradient(45deg, #f0f2f5 0, #f0f2f5 5px, #fff 5px, #fff 10px)',
+            border: '1px dashed #ccc',
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 10,
+          }}>
+            <span style={{ fontSize: 11, color: '#aaa', fontStyle: 'italic', fontFamily: 'sans-serif' }}>
+              brasão e cabeçalho oficial
+            </span>
+          </div>
+
+          {/* Department / origin segment */}
+          <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            {doc.segmentoOrigemNome?.toUpperCase() ?? doc.segmentoOrigemSigla ?? ''}
+          </div>
+
+          {/* Date + NetDoc number */}
+          {(dataFormatada || doc.numeroNetdoc) && (
+            <div style={{ fontSize: 11, color: '#555', lineHeight: 1.9, fontFamily: 'inherit' }}>
+              {dataFormatada && <div>{dataFormatada}</div>}
+              {doc.numeroNetdoc && <div>NND: {doc.numeroNetdoc}</div>}
+            </div>
+          )}
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid #ccc', margin: '0 0 22px' }} />
+
+        {/* ── Document title ───────────────────────────────── */}
+        {docTitulo && (
+          <div style={{ textAlign: 'center', marginBottom: 22 }}>
+            <strong style={{ fontSize: 13.5, letterSpacing: '0.03em' }}>{docTitulo}</strong>
+          </div>
+        )}
+
+        {/* ── Resumo as "Pauta" ────────────────────────────── */}
+        {doc.resumo && (
+          <p style={{ margin: '0 0 14px', textIndent: '0' }}>
+            <strong>Pauta:</strong> {doc.resumo}
+          </p>
+        )}
+
+        {/* ── Simple atributos (non-HTML, with value) ──────── */}
+        {atributoSimples.map(atipo => {
+          const val = formatAtributoDisplay(atipo, getAdoc(atipo));
+          if (val === '—' || !val) return null;
+          const label = atipo.label ?? atipo.nome ?? `Campo ${atipo.codigo}`;
+          return (
+            <p key={atipo.codigo} style={{ margin: '0 0 10px' }}>
+              <strong>{label}:</strong> {val}
+            </p>
+          );
+        })}
+
+        {/* ── Despacho / body (HTML) ───────────────────────── */}
+        {doc.despacho && (
+          <div
+            style={{ margin: '16px 0', textAlign: 'justify' }}
+            dangerouslySetInnerHTML={{ __html: doc.despacho }}
+          />
+        )}
+
+        {/* ── HTML atributos (full-width rich sections) ─────── */}
+        {atributoHtml.map(atipo => {
+          const raw = getVal(atipo);
+          if (!raw) return null;
+          const label = atipo.label ?? atipo.nome ?? `Campo ${atipo.codigo}`;
+          return (
+            <div key={atipo.codigo} style={{ margin: '16px 0' }}>
+              <strong style={{ display: 'block', marginBottom: 4 }}>{label}:</strong>
+              <div
+                style={{ textAlign: 'justify' }}
+                dangerouslySetInnerHTML={{ __html: raw }}
+              />
+            </div>
+          );
+        })}
+
+        {/* ── Signature placeholder ────────────────────────── */}
+        <div style={{
+          marginTop: 48,
+          textAlign: 'center',
+          padding: '10px 0',
+          borderTop: '1px solid #ddd',
+          fontSize: 11,
+          color: '#999',
+          fontStyle: 'italic',
+          fontFamily: 'sans-serif',
+        }}>
+          [ assinatura digital ICP-Brasil ]
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export function DocumentoDetalhePage() {
@@ -969,11 +1122,20 @@ export function DocumentoDetalhePage() {
             </div>
           )}
 
+          {/* Aba Documento — prévia formatada */}
+          {activeTab === 'document' && (
+            <DocumentoPreview
+              doc={doc}
+              atributosTipo={atributosTipo}
+              atributosDoc={atributosDoc}
+            />
+          )}
+
           {activeTab === 'comments' && (
             <ComentariosTab docId={doc.codigo} service={service} />
           )}
 
-          {activeTab !== 'overview' && activeTab !== 'anexos' && activeTab !== 'comments' && (
+          {activeTab !== 'overview' && activeTab !== 'anexos' && activeTab !== 'comments' && activeTab !== 'document' && (
             <div className={s.card}>
               <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', margin: 0, padding: '40px 0' }}>
                 Conteúdo da aba <strong style={{ color: 'var(--text-2)' }}>{TABS.find(t => t.key === activeTab)?.label}</strong> em construção.
