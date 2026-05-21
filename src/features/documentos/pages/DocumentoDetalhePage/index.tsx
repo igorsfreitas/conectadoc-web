@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
-import type { DocumentoDetalhe } from '../../models/documento.model';
+import type { DocumentoDetalhe, DocumentoDetalheAnexo } from '../../models/documento.model';
 import s from './style.module.scss';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -69,7 +69,174 @@ const Icon = {
   pen:      () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
   arrow:    () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
   dl:       () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  eye:      () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  close:    () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 };
+
+// ── Anexo helpers ───────────────────────────────────────────────────────────
+
+/** MIME types que o browser consegue pré-visualizar inline. */
+function canPreview(mime: string | null): boolean {
+  if (!mime) return false;
+  return (
+    mime === 'application/pdf' ||
+    mime.startsWith('image/') ||
+    mime.startsWith('text/')
+  );
+}
+
+/** Remove o param filename da URL → sem Content-Disposition: attachment → exibe inline. */
+function toPreviewUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete('filename');
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
+// ── AnexoPreviewModal ───────────────────────────────────────────────────────
+
+function AnexoPreviewModal({
+  anexo,
+  onClose,
+}: {
+  anexo: DocumentoDetalheAnexo;
+  onClose: () => void;
+}) {
+  const mime = anexo.mime ?? '';
+  const preview = toPreviewUrl(anexo.url ?? '');
+  const isPdf   = mime === 'application/pdf';
+  const isImage  = mime.startsWith('image/');
+  const isText   = mime.startsWith('text/');
+  const hasPreview = canPreview(mime) && !!anexo.url;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className={s.previewOverlay}
+      onClick={onClose}
+    >
+      <div
+        className={s.previewModal}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className={s.previewHeader}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className={s.pdfTag} style={{ flexShrink: 0 }}>
+              {(mime.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4)}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {anexo.nome}
+            </span>
+            {anexo.tamanho && (
+              <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{anexo.tamanho}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {anexo.url && (
+              <a
+                href={anexo.url}
+                download
+                className="btn btn-secondary"
+                style={{ height: 32, padding: '0 12px', fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+              >
+                <Icon.dl /> Baixar
+              </a>
+            )}
+            <button className={s.iconBtn} onClick={onClose} title="Fechar">
+              <Icon.close />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className={s.previewBody}>
+          {!hasPreview ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--text-3)' }}>
+              <span style={{ fontSize: 40 }}>📄</span>
+              <p style={{ margin: 0, fontSize: 13 }}>Pré-visualização não disponível para este tipo de arquivo.</p>
+              {anexo.url && (
+                <a href={anexo.url} download className="btn btn-primary" style={{ textDecoration: 'none' }}>
+                  <Icon.dl /> Baixar arquivo
+                </a>
+              )}
+            </div>
+          ) : isPdf ? (
+            <iframe
+              src={preview}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title={anexo.nome}
+            />
+          ) : isImage ? (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-2)', overflow: 'auto', padding: 16 }}>
+              <img
+                src={preview}
+                alt={anexo.nome}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.15)' }}
+              />
+            </div>
+          ) : isText ? (
+            <iframe
+              src={preview}
+              style={{ width: '100%', height: '100%', border: 'none', background: '#fff', fontFamily: 'monospace' }}
+              title={anexo.nome}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AnexoRow — row usada tanto na visão geral quanto na aba Anexos ──────────
+
+function AnexoRow({
+  anexo,
+  onPreview,
+}: {
+  anexo: DocumentoDetalheAnexo;
+  onPreview: (a: DocumentoDetalheAnexo) => void;
+}) {
+  const shortExt = (anexo.mime?.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4);
+  return (
+    <div className={s.anexoItem}>
+      <span className={s.pdfTag}>{shortExt}</span>
+      <span className={s.anexoName}>{anexo.nome}</span>
+      {anexo.tamanho && <span className={s.anexoSize}>{anexo.tamanho}</span>}
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        {canPreview(anexo.mime) && (
+          <button
+            className={s.previewBtn}
+            title="Visualizar"
+            onClick={() => onPreview(anexo)}
+          >
+            <Icon.eye />
+          </button>
+        )}
+        {anexo.url ? (
+          <a
+            href={anexo.url}
+            download
+            className={s.dlBtn}
+            title="Baixar"
+          >
+            <Icon.dl />
+          </a>
+        ) : (
+          <button className={s.dlBtn} disabled title="Baixar"><Icon.dl /></button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Components ─────────────────────────────────────────────────────────────
 
@@ -91,6 +258,7 @@ export function DocumentoDetalhePage() {
   const [doc, setDoc] = useState<DocumentoDetalhe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewAnexo, setPreviewAnexo] = useState<DocumentoDetalheAnexo | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +320,12 @@ export function DocumentoDetalhePage() {
 
   return (
     <div className={s.page}>
+      {previewAnexo && (
+        <AnexoPreviewModal
+          anexo={previewAnexo}
+          onClose={() => setPreviewAnexo(null)}
+        />
+      )}
 
       {/* Breadcrumb */}
       <div className={s.crumb}>
@@ -264,6 +438,15 @@ export function DocumentoDetalhePage() {
               <div className={s.card}>
                 <div className={s.cardHeader}>
                   <h3 className={s.cardTitle}>Anexos</h3>
+                  {doc.anexos.length > 0 && (
+                    <button
+                      className={s.tab}
+                      style={{ fontSize: 12.5, padding: '4px 10px', borderBottom: 'none' }}
+                      onClick={() => setActiveTab('anexos')}
+                    >
+                      Ver todos ({doc.anexos.length})
+                    </button>
+                  )}
                 </div>
                 {doc.anexos.length === 0 ? (
                   <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
@@ -271,12 +454,7 @@ export function DocumentoDetalhePage() {
                   </p>
                 ) : (
                   doc.anexos.map(a => (
-                    <div key={a.id} className={s.anexoItem}>
-                      <span className={s.pdfTag}>{(a.mime?.split('/')[1] ?? 'FILE').toUpperCase()}</span>
-                      <span className={s.anexoName}>{a.nome}</span>
-                      {a.tamanho && <span className={s.anexoSize}>{a.tamanho}</span>}
-                      <button className={s.dlBtn} title="Baixar"><Icon.dl /></button>
-                    </div>
+                    <AnexoRow key={a.id} anexo={a} onPreview={setPreviewAnexo} />
                   ))
                 )}
               </div>
@@ -288,36 +466,18 @@ export function DocumentoDetalhePage() {
             <div className={s.card}>
               <div className={s.cardHeader}>
                 <h3 className={s.cardTitle}>Peças e Anexos</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                  {doc.anexos.length} {doc.anexos.length === 1 ? 'arquivo' : 'arquivos'}
+                </span>
               </div>
               {doc.anexos.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
                   Nenhum anexo neste documento.
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {doc.anexos.map(a => (
-                    <div key={a.id} className={s.anexoItem}>
-                      <span className={s.pdfTag}>
-                        {(a.mime?.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4)}
-                      </span>
-                      <span className={s.anexoName}>{a.nome}</span>
-                      {a.tamanho && <span className={s.anexoSize}>{a.tamanho}</span>}
-                      {a.url ? (
-                        <a
-                          href={a.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={s.dlBtn}
-                          title="Baixar"
-                        >
-                          <Icon.dl />
-                        </a>
-                      ) : (
-                        <button className={s.dlBtn} disabled title="Baixar"><Icon.dl /></button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                doc.anexos.map(a => (
+                  <AnexoRow key={a.id} anexo={a} onPreview={setPreviewAnexo} />
+                ))
               )}
             </div>
           )}
