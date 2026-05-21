@@ -100,7 +100,7 @@ Cadastre em `Settings > Secrets and variables > Actions > Secrets`:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` | Diretorio base criado pela infra |
 | `WEB_ENV_FILE` | conteudo do `.env.production` | Variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada Bitbucket | Acesso de leitura aos pacotes privados `@afinz/*` |
-| `WHATSAPP_API_URL` | `https://wpp.seu-dominio.com` | URL base da API de WhatsApp compativel com Evolution API e acessivel pelo GitHub Actions |
+| `WHATSAPP_API_URL` | `http://187.77.7.7/wpp` | URL base da Evolution API publicada pela infra |
 | `WHATSAPP_API_KEY` | token da API | Chave usada para enviar mensagens |
 | `WHATSAPP_INSTANCE` | `conectadoc` | Instancia/sessao de WhatsApp usada para envio |
 

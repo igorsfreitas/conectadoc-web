@@ -107,7 +107,7 @@ Cadastre:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` |
 | `WEB_ENV_FILE` | variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada com acesso aos pacotes `@afinz/*` |
-| `WHATSAPP_API_URL` | URL base da API de WhatsApp compativel com Evolution API e acessivel pelo GitHub Actions |
+| `WHATSAPP_API_URL` | `http://187.77.7.7/wpp` |
 | `WHATSAPP_API_KEY` | chave/token da API de WhatsApp |
 | `WHATSAPP_INSTANCE` | instancia/sessao usada para envio |
 
