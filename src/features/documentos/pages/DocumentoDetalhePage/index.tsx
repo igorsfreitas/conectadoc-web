@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
-import type { CoautorDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
+import type { DocumentosService } from '../../../../infra/services/documentos/documentos.service';
+import type { AtributoDocumento, CoautorDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
+import type { AtributoTipoDocumento } from '../../../tipo-documento/models/tipo-documento.model';
 import s from './style.module.scss';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -45,6 +47,53 @@ function avatarColor(codigo: number): string {
 function initials(name: string | null): string {
   if (!name) return '?';
   return name.trim().split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+}
+
+// ── Atributo helpers ───────────────────────────────────────────────────────
+
+function extractAtributoVal(atipo: AtributoTipoDocumento, adoc: AtributoDocumento | undefined): string {
+  if (!adoc) return '';
+  const t = atipo.tipo;
+  if (t === 2)             return (adoc.valorData ?? adoc.valor ?? '').split('T')[0];
+  if (t === 5 || t === 6) return String(adoc.valorFloat ?? adoc.valor ?? '');
+  return adoc.valor ?? '';
+}
+
+function formatAtributoDisplay(atipo: AtributoTipoDocumento, adoc: AtributoDocumento | undefined): string {
+  const raw = extractAtributoVal(atipo, adoc);
+  if (!raw) return '—';
+  const t = atipo.tipo;
+  // Date → dd/MM/yyyy
+  if (t === 2) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : raw;
+  }
+  // Checkbox
+  if (t === 11) return raw === '1' ? 'Sim' : 'Não';
+  // Strip HTML
+  if (t === 7) {
+    const plain = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return plain || '—';
+  }
+  // Multi-valued: split and join
+  if (t === 8) {
+    const parts = raw.includes('|') ? raw.split('|')
+      : raw.includes(';')          ? raw.split(';')
+      : [raw];
+    return parts.map(p => p.trim()).filter(Boolean).join(' · ');
+  }
+  return raw;
+}
+
+/** Group sorted atributos by their aba field. */
+function groupByAba(atributos: AtributoTipoDocumento[]): Array<[string, AtributoTipoDocumento[]]> {
+  const map = new Map<string, AtributoTipoDocumento[]>();
+  for (const a of atributos) {
+    const key = a.aba?.trim() || '';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(a);
+  }
+  return Array.from(map.entries());
 }
 
 const TABS = [
@@ -257,7 +306,7 @@ function CoautoresCard({
   service,
 }: {
   docId: number;
-  service: ReturnType<typeof useInject>;
+  service: DocumentosService;
 }) {
   const [coautores, setCoautores]       = useState<CoautorDocumento[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -472,11 +521,14 @@ export function DocumentoDetalhePage() {
   const { codigo } = useParams();
   const navigate = useNavigate();
   const service = useInject('DocumentosService');
+  const tipoDocService = useInject('TipoDocumentoService');
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [doc, setDoc] = useState<DocumentoDetalhe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewAnexo, setPreviewAnexo] = useState<DocumentoDetalheAnexo | null>(null);
+  const [atributosTipo, setAtributosTipo] = useState<AtributoTipoDocumento[]>([]);
+  const [atributosDoc, setAtributosDoc] = useState<AtributoDocumento[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -503,6 +555,21 @@ export function DocumentoDetalhePage() {
 
     return () => { cancelled = true; };
   }, [codigo, service]);
+
+  // Load custom fields once doc is ready
+  useEffect(() => {
+    if (!doc?.tipoDocumentoCodigo) return;
+    let cancelled = false;
+    Promise.allSettled([
+      tipoDocService.findAtributos(String(doc.tipoDocumentoCodigo)),
+      service.findAtributos(doc.codigo),
+    ]).then(([tiposRes, valsRes]) => {
+      if (cancelled) return;
+      setAtributosTipo(tiposRes.status === 'fulfilled' ? tiposRes.value : []);
+      setAtributosDoc(valsRes.status === 'fulfilled' ? valsRes.value : []);
+    });
+    return () => { cancelled = true; };
+  }, [doc?.codigo, doc?.tipoDocumentoCodigo]);
 
   if (loading) {
     return (
@@ -630,6 +697,46 @@ export function DocumentoDetalhePage() {
                     <h3 className={s.cardTitle}>Despacho</h3>
                   </div>
                   <p className={s.resumoText}>{doc.despacho}</p>
+                </div>
+              )}
+
+              {/* Campos customizados do tipo de documento */}
+              {atributosTipo.length > 0 && (
+                <div className={s.card}>
+                  <div className={s.cardHeader}>
+                    <h3 className={s.cardTitle}>Campos do documento</h3>
+                  </div>
+                  {groupByAba(atributosTipo).map(([aba, items]) => (
+                    <div key={aba || '__root__'}>
+                      {aba && (
+                        <p style={{
+                          fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase',
+                          letterSpacing: '0.08em', color: 'var(--text-3)',
+                          margin: '14px 0 6px',
+                        }}>
+                          {aba}
+                        </p>
+                      )}
+                      {items.map(atipo => {
+                        const adoc = atributosDoc.find(a => a.codigoAtributoTipo === atipo.codigo);
+                        const val = formatAtributoDisplay(atipo, adoc);
+                        return (
+                          <div key={atipo.codigo} className={s.detailRow}
+                               style={{ alignItems: 'flex-start', paddingTop: 6, paddingBottom: 6 }}>
+                            <span className={s.detailKey} style={{ paddingTop: 1 }}>
+                              {atipo.label ?? atipo.nome ?? `Campo ${atipo.codigo}`}
+                            </span>
+                            <span className={s.detailVal} style={{
+                              color: val === '—' ? 'var(--text-3)' : undefined,
+                              fontStyle: val === '—' ? 'italic' : undefined,
+                            }}>
+                              {val}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               )}
 
