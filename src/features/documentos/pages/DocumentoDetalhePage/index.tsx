@@ -497,6 +497,16 @@ export function DocumentoDetalhePage() {
           {/* Próxima ação */}
           <div className={s.sideCard}>
             <p className={s.sideLabel}>Próxima ação</p>
+            {/* Show "Editar" only when document hasn't been tramitated yet */}
+            {doc.tipoDespacho === null && doc.dataRecebido === null && (
+              <button
+                className={s.btnSecondary}
+                onClick={() => navigate(`/documentos/${doc.codigo}/editar`)}
+                style={{ marginBottom: 8 }}
+              >
+                <Icon.pen /> Editar documento
+              </button>
+            )}
             <button className={s.btnPrimary}><Icon.pen /> Assinar e tramitar</button>
             <button className={s.btnSecondary}><Icon.arrow /> Tramitar para...</button>
             <button className={s.btnGhost}>Recusar e devolver</button>

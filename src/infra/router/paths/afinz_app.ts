@@ -76,6 +76,11 @@ export const afinzAppPaths = {
     path: '/documentos',
     asRoute: '/documentos',
   },
+  documentoEditar: {
+    name: 'Editar Documento',
+    path: '/documentos/:codigo/editar',
+    asRoute: '/documentos/:codigo/editar',
+  },
   assinaturas: {
     name: 'Assinaturas',
     path: '/assinaturas',

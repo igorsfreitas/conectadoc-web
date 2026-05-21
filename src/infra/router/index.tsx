@@ -5,6 +5,7 @@ import { ServerInstabilityPage } from "../../features/server_instability";
 import { CaixaEntradaPage } from "../../features/documentos/pages/CaixaEntradaPage";
 import { NovoDocumentoPage } from "../../features/documentos/pages/NovoDocumentoPage";
 import { DocumentoDetalhePage } from "../../features/documentos/pages/DocumentoDetalhePage";
+import { DocumentoEditPage } from "../../features/documentos/pages/DocumentoEditPage";
 import { AssuntosPage } from "../../features/assuntos/pages/assuntos_page";
 import { HierarquiaPage } from "../../features/hierarquia/pages/hierarquia_page";
 import { TipoEntidadeExternaPage } from "../../features/tipo-entidade-externa/pages/tipo_entidade_externa_page";
@@ -44,6 +45,7 @@ function ProtectedRoutes() {
       <Route element={<AppLayout />}>
         <Route path={afinzAppPaths.caixaEntrada.asRoute} element={<CaixaEntradaPage />} />
         <Route path={afinzAppPaths.novoDocumento.asRoute} element={<NovoDocumentoPage />} />
+        <Route path={afinzAppPaths.documentoEditar.asRoute} element={<DocumentoEditPage />} />
         <Route path={`${afinzAppPaths.documentos.asRoute}/:codigo`} element={<DocumentoDetalhePage />} />
         <Route path={`${afinzAppPaths.caixaEntrada.asRoute}/:codigo`} element={<DocumentoDetalhePage />} />
         <Route path={afinzAppPaths.assuntos.asRoute} element={<AssuntosPage />} />
