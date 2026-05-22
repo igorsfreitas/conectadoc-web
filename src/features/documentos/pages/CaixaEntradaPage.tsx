@@ -5,10 +5,24 @@ import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CaixaItem, CaixaResponse, CaixaCounts, CaixaTab } from "../models/documento.model";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | Date | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+type SortKey = "numeroNetdoc" | "origemSigla" | "assuntoTexto" | "numero" | "tipoDocumentoSigla" | "dataEnvio" | "dataCriacao";
+type SortDir = "asc" | "desc";
+
+function sortItems(items: CaixaItem[], key: SortKey, dir: SortDir): CaixaItem[] {
+  return [...items].sort((a, b) => {
+    const va = a[key] ?? "";
+    const vb = b[key] ?? "";
+    let cmp = 0;
+    if (va < vb) cmp = -1;
+    else if (va > vb) cmp = 1;
+    return dir === "asc" ? cmp : -cmp;
+  });
 }
 
 function statusInfo(item: CaixaItem): { label: string; color: string; bg: string } {
@@ -48,6 +62,8 @@ export function CaixaEntradaPage() {
   const [segmentoNome, setSegmentoNome] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("dataCriacao");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (t: CaixaTab, p: number, s: string) => {
@@ -113,6 +129,17 @@ export function CaixaEntradaPage() {
   }
 
   const tabCount = (k: CaixaTab) => counts[k] ?? 0;
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sortedData = sortItems(data, sortKey, sortDir);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, height: "100%" }}>
@@ -211,23 +238,46 @@ export function CaixaEntradaPage() {
                     style={{ cursor: "pointer" }}
                   />
                 </th>
-                {["NETDOC", "ORIGEM", "ASSUNTO", "NÚMERO", "TIPO", "TRAMITAÇÃO", "STATUS", "RECEBIDO"].map(h => (
-                  <th key={h} style={{
-                    padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600,
-                    color: "var(--text-3, #6b7280)", letterSpacing: "0.05em", textTransform: "uppercase",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {h}
+                {(
+                  [
+                    { label: "NETDOC",       key: "numeroNetdoc" as SortKey },
+                    { label: "ORIGEM",        key: "origemSigla" as SortKey },
+                    { label: "ASSUNTO",       key: "assuntoTexto" as SortKey },
+                    { label: "NÚMERO",        key: "numero" as SortKey },
+                    { label: "TIPO",          key: "tipoDocumentoSigla" as SortKey },
+                    { label: "TRAMITAÇÃO",    key: null },
+                    { label: "STATUS",        key: null },
+                    { label: "RECEBIDO",      key: "dataEnvio" as SortKey },
+                    { label: "DATA CRIAÇÃO",  key: "dataCriacao" as SortKey },
+                  ] as { label: string; key: SortKey | null }[]
+                ).map(({ label, key }) => (
+                  <th
+                    key={label}
+                    onClick={key ? () => handleSort(key) : undefined}
+                    style={{
+                      padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600,
+                      color: key && sortKey === key ? "var(--brand-600, #2563eb)" : "var(--text-3, #6b7280)",
+                      letterSpacing: "0.05em", textTransform: "uppercase",
+                      whiteSpace: "nowrap", cursor: key ? "pointer" : "default",
+                      userSelect: "none",
+                    }}
+                  >
+                    {label}
+                    {key && (
+                      <span style={{ marginLeft: 4, fontSize: 10, opacity: sortKey === key ? 1 : 0.35 }}>
+                        {sortKey === key ? (sortDir === "asc" ? "▲" : "▼") : "↕"}
+                      </span>
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && data.length === 0 ? (
-                <tr><td colSpan={9} style={{ textAlign: "center", padding: 40, color: "var(--text-3, #9ca3af)" }}>Carregando…</td></tr>
+                <tr><td colSpan={10} style={{ textAlign: "center", padding: 40, color: "var(--text-3, #9ca3af)" }}>Carregando…</td></tr>
               ) : data.length === 0 ? (
-                <tr><td colSpan={9} style={{ textAlign: "center", padding: 40, color: "var(--text-3, #9ca3af)" }}>Nenhum documento encontrado.</td></tr>
-              ) : data.map(item => {
+                <tr><td colSpan={10} style={{ textAlign: "center", padding: 40, color: "var(--text-3, #9ca3af)" }}>Nenhum documento encontrado.</td></tr>
+              ) : sortedData.map(item => {
                 const status = statusInfo(item);
                 const isSelected = selected.has(item.documentoCodigo);
                 return (
@@ -328,6 +378,9 @@ export function CaixaEntradaPage() {
                     </td>
                     <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontSize: 12, color: "var(--text-2, #374151)" }}>
                       {formatDate(item.dataEnvio)}
+                    </td>
+                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap", fontSize: 12, color: "var(--text-2, #374151)" }}>
+                      {formatDate(item.dataCriacao)}
                     </td>
                   </tr>
                 );

@@ -4,7 +4,7 @@ import { AtributoTipoDocumento } from "../../tipo-documento/models/tipo-document
 import { Assunto } from "../../assuntos/models/assunto.model";
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
-import { CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples } from "../models/documento.model";
+import { CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples, UsuarioSearchItem } from "../models/documento.model";
 import { RichEditor } from "../../../infra/components/rich-editor";
 
 // ── Multi-valor splitter — legacy data uses several different separators ──
@@ -198,17 +198,112 @@ function FieldRow({
   );
 }
 
+// ── UserSearchEditor — autocomplete de usuários do sistema ───────────────────
+function UserSearchEditor({
+  value,
+  onChange,
+  searchUsuarios,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  searchUsuarios: (q: string) => Promise<UsuarioSearchItem[]>;
+}) {
+  const [results, setResults]   = useState<UsuarioSearchItem[]>([]);
+  const [open,    setOpen]      = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const debounce                = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef            = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function handleChange(v: string) {
+    onChange(v);
+    if (debounce.current) clearTimeout(debounce.current);
+    if (v.trim().length < 2) { setResults([]); setOpen(false); return; }
+    debounce.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await searchUsuarios(v.trim());
+        setResults(res);
+        setOpen(res.length > 0);
+      } catch { /* ignore */ } finally { setLoading(false); }
+    }, 300);
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <input
+        type="text"
+        autoFocus
+        value={value}
+        onChange={e => handleChange(e.target.value)}
+        placeholder="Digite o nome para buscar..."
+        style={{ ...inputStyle, paddingRight: loading ? 36 : 12 }}
+        onFocus={e => { e.target.style.borderColor = "var(--brand-600, #2563eb)"; if (value.trim().length >= 2 && results.length > 0) setOpen(true); }}
+        onBlur={e => (e.target.style.borderColor = "var(--border, #d1d5db)")}
+      />
+      {loading && (
+        <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--text-3)" }}>…</span>
+      )}
+      {open && results.length > 0 && (
+        <div style={{
+          position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)",
+          background: "#fff", border: "1px solid var(--border, #d1d5db)",
+          borderRadius: 8, zIndex: 200, maxHeight: 220, overflowY: "auto",
+          boxShadow: "0 8px 24px rgba(15,23,42,.14)",
+        }}>
+          {results.map(u => (
+            <button
+              key={u.codigo}
+              type="button"
+              onMouseDown={e => {
+                e.preventDefault();
+                onChange(u.nome ?? "");
+                setOpen(false);
+              }}
+              style={{
+                display: "flex", flexDirection: "column", width: "100%",
+                padding: "8px 14px", textAlign: "left",
+                background: "transparent", border: "none",
+                borderBottom: "1px solid var(--surface-2, #f3f4f6)",
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2, #f9fafb)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ fontSize: 13.5, color: "var(--text, #111)", fontWeight: 500 }}>{u.nome ?? "—"}</span>
+              {(u.matricula || u.cpf) && (
+                <span style={{ fontSize: 11.5, color: "var(--text-3, #9ca3af)", fontFamily: "JetBrains Mono, monospace" }}>
+                  {u.matricula ? `Matrícula: ${u.matricula}` : u.cpf}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── EditFieldDialog — opens an editor matching the atributo's tipo ────────────
 function EditFieldDialog({
   atributo,
   initialValue,
   onSave,
   onClose,
+  searchUsuarios,
 }: {
   atributo: AtributoTipoDocumento | null;
   initialValue: string;
   onSave: (v: string) => void;
   onClose: () => void;
+  searchUsuarios?: (q: string) => Promise<UsuarioSearchItem[]>;
 }) {
   const [draft, setDraft] = useState(initialValue);
 
@@ -230,7 +325,22 @@ function EditFieldDialog({
   const blurBorder = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     (e.target.style.borderColor = "var(--border, #d1d5db)");
 
+  const isUserField = (() => {
+    const n = (atributo?.nome ?? "").toLowerCase();
+    const l = (atributo?.label ?? "").toLowerCase();
+    return ["nome", "destinatario", "destinatário", "para"].some(k => n === k || l === k);
+  })();
+
   function renderEditor() {
+    if (isUserField && searchUsuarios) {
+      return (
+        <UserSearchEditor
+          value={draft}
+          onChange={setDraft}
+          searchUsuarios={searchUsuarios}
+        />
+      );
+    }
     if (tipo === 11) {
       return (
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "var(--text-2, #374151)", cursor: "pointer" }}>
@@ -533,6 +643,10 @@ export function NovoDocumentoPage() {
   const [creating,   setCreating]   = useState(false);
   const [saving,     setSaving]     = useState(false);
   const [error,      setError]      = useState<string | null>(null);
+
+  // UI modals
+  const [showSigilosoConfirm, setShowSigilosoConfirm] = useState(false);
+  const [showPreview,          setShowPreview]          = useState(false);
 
   // Anexos (peças)
   const [pecas,          setPecas]          = useState<PecaDocumento[]>([]);
@@ -846,18 +960,78 @@ export function NovoDocumentoPage() {
             </div>
           </div>
 
-          {/* Sigiloso */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-2, #374151)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={flagConfidencial}
-                onChange={e => setFlagConfidencial(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: "pointer" }}
-              />
-              Documento sigiloso (acesso restrito) 🔒
-            </label>
+          {/* Sigiloso — toggle alinhado à direita */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "12px 16px", marginBottom: 20, borderRadius: 10,
+            background: flagConfidencial ? "#fef2f2" : "var(--surface-2, #f9fafb)",
+            border: `1px solid ${flagConfidencial ? "#fecaca" : "var(--border, #e5e7eb)"}`,
+            transition: "background .2s, border-color .2s",
+          }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 500, color: flagConfidencial ? "#dc2626" : "var(--text-2, #374151)" }}>
+                🔒 Documento sigiloso
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-3, #6b7280)", marginTop: 2 }}>
+                {flagConfidencial ? "Acesso restrito — somente pessoas autorizadas" : "Ative para restringir o acesso a este documento"}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={flagConfidencial}
+              onChange={e => {
+                if (e.target.checked) {
+                  setShowSigilosoConfirm(true);
+                } else {
+                  setFlagConfidencial(false);
+                }
+              }}
+              style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#dc2626", flexShrink: 0 }}
+            />
           </div>
+
+          {/* Modal de confirmação sigiloso */}
+          {showSigilosoConfirm && (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 60,
+              background: "rgba(15, 23, 42, 0.5)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+            }}>
+              <div style={{
+                background: "#fff", borderRadius: 14, maxWidth: 440, width: "100%",
+                boxShadow: "0 20px 50px rgba(15,23,42,.25)",
+              }}>
+                <div style={{ padding: "24px 28px 20px" }}>
+                  <div style={{ fontSize: 20, marginBottom: 10 }}>🔒</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text, #111)", marginBottom: 8 }}>
+                    Tornar documento sigiloso?
+                  </div>
+                  <p style={{ fontSize: 13.5, color: "var(--text-2, #374151)", lineHeight: 1.55, margin: 0 }}>
+                    Deseja realmente tornar este documento sigiloso? O acesso será restrito e somente
+                    pessoas autorizadas poderão visualizá-lo.
+                  </p>
+                </div>
+                <div style={{
+                  padding: "14px 24px 20px", display: "flex", justifyContent: "flex-end", gap: 10,
+                }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ minWidth: 100 }}
+                    onClick={() => setShowSigilosoConfirm(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    style={{ minWidth: 120, background: "#dc2626", borderColor: "#dc2626" }}
+                    onClick={() => { setFlagConfidencial(true); setShowSigilosoConfirm(false); }}
+                  >
+                    🔒 Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Footer: NetDoc + Próximo */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 16, borderTop: "1px solid var(--border, #e5e7eb)" }}>
@@ -983,7 +1157,21 @@ export function NovoDocumentoPage() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18 }}>
-            <SidebarBtn icon="👁">Pré-visualizar</SidebarBtn>
+            <button
+              type="button"
+              onClick={() => setShowPreview(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                height: 36, padding: "0 12px",
+                background: "var(--surface-2, #f9fafb)",
+                border: "1px solid var(--border, #e5e7eb)",
+                borderRadius: 8, fontSize: 13, color: "var(--text-2, #374151)",
+                cursor: "pointer", textAlign: "left",
+              }}
+            >
+              <span>👁</span>
+              <span>Pré-visualizar</span>
+            </button>
             <SidebarBtn icon="👥">Co-autores (0)</SidebarBtn>
             <button
               type="button"
@@ -1158,12 +1346,144 @@ export function NovoDocumentoPage() {
         </section>
       </div>
 
+      {/* ── Pré-visualização do documento ──────────────────────────────────── */}
+      {showPreview && (
+        <div
+          onClick={() => setShowPreview(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            background: "rgba(15, 23, 42, 0.6)",
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
+            padding: "32px 24px", overflowY: "auto",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 760, background: "#fff",
+              borderRadius: 4, boxShadow: "0 20px 60px rgba(15,23,42,.35)",
+              fontFamily: "Times New Roman, serif",
+            }}
+          >
+            {/* Botão fechar */}
+            <div style={{
+              display: "flex", justifyContent: "flex-end",
+              padding: "8px 12px", background: "#f3f4f6", borderBottom: "1px solid #e5e7eb",
+              fontFamily: "Inter, sans-serif",
+            }}>
+              <button
+                onClick={() => setShowPreview(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#6b7280" }}
+              >
+                ✕ Fechar visualização
+              </button>
+            </div>
+
+            {/* Corpo do documento */}
+            <div style={{ padding: "40px 52px", minHeight: 900, fontSize: 12, lineHeight: 1.8, color: "#111" }}>
+
+              {/* ── Cabeçalho com logo ── */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                borderBottom: "2px solid #1e3a5f", paddingBottom: 16, marginBottom: 24,
+              }}>
+                {/* Logo da prefeitura */}
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: 8,
+                    background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                  }}>
+                    <span style={{ color: "#fff", fontSize: 20, fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                      {(createdDoc?.segmentoOrigemSigla ?? "PR").slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {createdDoc?.segmentoOrigemNome ?? "Prefeitura Municipal"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "Inter, sans-serif" }}>
+                      {createdDoc?.segmentoOrigemSigla ?? ""}
+                    </div>
+                  </div>
+                </div>
+                {/* NetDoc + data */}
+                <div style={{ textAlign: "right", fontSize: 11, color: "#374151", fontFamily: "Inter, sans-serif" }}>
+                  <div style={{ fontFamily: "JetBrains Mono, monospace", fontWeight: 700, fontSize: 13 }}>
+                    {createdDoc?.numeroNetdoc ?? "—"}
+                  </div>
+                  <div>{new Date(createdDoc?.dataHoraCriacao ?? Date.now()).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
+                  {flagConfidencial && (
+                    <div style={{ marginTop: 4, color: "#dc2626", fontWeight: 700, fontSize: 10, letterSpacing: "0.08em" }}>
+                      🔒 SIGILOSO
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Título do tipo de documento ── */}
+              <div style={{ textAlign: "center", marginBottom: 24 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#1e3a5f" }}>
+                  {createdDoc?.tipoDocumentoNome ?? "Documento"}
+                </div>
+                {createdDoc?.numero && (
+                  <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 2 }}>
+                    N° {createdDoc.numero}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Atributos preenchidos ── */}
+              {atributos.length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20, fontSize: 12 }}>
+                  <tbody>
+                    {atributos.map(a => {
+                      const raw = atributoValues[a.codigo] ?? "";
+                      if (!raw) return null;
+                      const label = a.label ?? a.nome ?? `Campo ${a.codigo}`;
+                      const display = formatAtributoValue(a, raw);
+                      return (
+                        <tr key={a.codigo} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                          <td style={{ padding: "5px 8px 5px 0", fontWeight: 600, color: "#374151", width: 180, verticalAlign: "top" }}>
+                            {label}:
+                          </td>
+                          <td style={{ padding: "5px 0", color: "#111" }}>{display}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              {/* ── Corpo / despacho ── */}
+              {conteudo ? (
+                <div
+                  style={{ marginTop: 16, lineHeight: 1.9, color: "#111", fontSize: 12 }}
+                  dangerouslySetInnerHTML={{ __html: conteudo }}
+                />
+              ) : (
+                <div style={{ marginTop: 16, color: "#9ca3af", fontStyle: "italic", fontSize: 12 }}>
+                  (Conteúdo não preenchido)
+                </div>
+              )}
+
+              {/* ── Rodapé ── */}
+              <div style={{ marginTop: 60, borderTop: "1px solid #e5e7eb", paddingTop: 16, fontSize: 11, color: "#9ca3af", textAlign: "center", fontFamily: "Inter, sans-serif" }}>
+                Documento gerado pelo ConectaDoc · {createdDoc?.segmentoOrigemNome} · {new Date().toLocaleDateString("pt-BR")}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Atributo edit dialog */}
       <EditFieldDialog
         atributo={editingAtributo}
         initialValue={editingAtributo ? (atributoValues[editingAtributo.codigo] ?? "") : ""}
         onSave={v => editingAtributo && setAtributoValues(prev => ({ ...prev, [editingAtributo.codigo]: v }))}
         onClose={() => setEditingAtributo(null)}
+        searchUsuarios={q => docService.searchUsuarios(q)}
       />
 
       {/* Conteúdo fallback dialog (when tipo has no atributos) */}

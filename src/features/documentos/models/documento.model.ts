@@ -149,6 +149,7 @@ export interface CaixaItem {
   destinoNome: string | null;
   tipoDocumentoNome: string | null;
   tipoDocumentoSigla: string | null;
+  dataCriacao: string | null;
 }
 
 export interface CaixaCounts {
