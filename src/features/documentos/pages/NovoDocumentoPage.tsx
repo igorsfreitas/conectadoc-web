@@ -4,7 +4,7 @@ import { AtributoTipoDocumento } from "../../tipo-documento/models/tipo-document
 import { Assunto } from "../../assuntos/models/assunto.model";
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
-import { CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples, UsuarioSearchItem } from "../models/documento.model";
+import { CoautorDocumento, CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples, UsuarioSearchItem } from "../models/documento.model";
 import { RichEditor } from "../../../infra/components/rich-editor";
 
 // ── Multi-valor splitter — legacy data uses several different separators ──
@@ -654,6 +654,15 @@ export function NovoDocumentoPage() {
   const [showAnexos,     setShowAnexos]      = useState(false);
   const fileInputRef                         = useRef<HTMLInputElement>(null);
 
+  // Co-autores
+  const [coautores,       setCoautores]       = useState<CoautorDocumento[]>([]);
+  const [showCoautores,   setShowCoautores]   = useState(false);
+  const [coautorQuery,    setCoautorQuery]    = useState("");
+  const [coautorResults,  setCoautorResults]  = useState<UsuarioSearchItem[]>([]);
+  const [addingCoautor,   setAddingCoautor]   = useState(false);
+  const [removingCoautor, setRemovingCoautor] = useState<number | null>(null);
+  const coautorDebounceRef                    = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (step === 2) {
       docService.findTiposInterno().then(setTipos).catch(() => {});
@@ -757,6 +766,65 @@ export function NovoDocumentoPage() {
       // silently ignore — user can retry
     } finally {
       setUploadingPeca(false);
+    }
+  }
+
+  // ── Co-autores handlers ────────────────────────────────────────────────────
+  function handleCoautorQueryChange(q: string) {
+    setCoautorQuery(q);
+    setCoautorResults([]);
+    if (coautorDebounceRef.current) clearTimeout(coautorDebounceRef.current);
+    if (!q.trim()) return;
+    coautorDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await docService.searchUsuarios(q.trim());
+        setCoautorResults(res);
+      } catch {
+        setCoautorResults([]);
+      }
+    }, 300);
+  }
+
+  async function handleAddCoautor(u: UsuarioSearchItem) {
+    if (!createdDoc || addingCoautor) return;
+    if (coautores.some(c => c.codigoUsuario === u.codigo)) return;
+    setAddingCoautor(true);
+    try {
+      const novo = await docService.addCoautor(createdDoc.codigo, u.codigo);
+      setCoautores(prev => [...prev, novo]);
+      setCoautorQuery("");
+      setCoautorResults([]);
+    } catch {
+      // silently ignore
+    } finally {
+      setAddingCoautor(false);
+    }
+  }
+
+  async function handleRemoveCoautor(codigoUsuario: number) {
+    if (!createdDoc) return;
+    setRemovingCoautor(codigoUsuario);
+    try {
+      await docService.removeCoautor(createdDoc.codigo, codigoUsuario);
+      setCoautores(prev => prev.filter(c => c.codigoUsuario !== codigoUsuario));
+    } catch {
+      // silently ignore
+    } finally {
+      setRemovingCoautor(null);
+    }
+  }
+
+  // Load co-autores when panel opens
+  async function handleToggleCoautores() {
+    const next = !showCoautores;
+    setShowCoautores(next);
+    if (next && createdDoc && coautores.length === 0) {
+      try {
+        const list = await docService.listCoautores(createdDoc.codigo);
+        setCoautores(list);
+      } catch {
+        // silently ignore
+      }
     }
   }
 
@@ -1172,7 +1240,137 @@ export function NovoDocumentoPage() {
               <span>👁</span>
               <span>Pré-visualizar</span>
             </button>
-            <SidebarBtn icon="👥">Co-autores (0)</SidebarBtn>
+            {/* Co-autores toggle */}
+            <button
+              type="button"
+              onClick={handleToggleCoautores}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                height: 36, padding: "0 12px",
+                background: showCoautores ? "oklch(0.94 0.04 250)" : "var(--surface-2, #f9fafb)",
+                border: `1px solid ${showCoautores ? "var(--brand-600, #2563eb)" : "var(--border, #e5e7eb)"}`,
+                borderRadius: 8, fontSize: 13,
+                color: showCoautores ? "var(--brand-600, #2563eb)" : "var(--text-2, #374151)",
+                cursor: "pointer", textAlign: "left",
+              }}
+            >
+              <span>👥</span>
+              <span>Co-autores ({coautores.length})</span>
+            </button>
+
+            {/* Co-autores panel */}
+            {showCoautores && (
+              <div style={{ marginTop: -4, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+                {/* Search */}
+                <div style={{ position: "relative", marginBottom: 10 }}>
+                  <input
+                    type="text"
+                    placeholder="Buscar usuário…"
+                    value={coautorQuery}
+                    onChange={e => handleCoautorQueryChange(e.target.value)}
+                    disabled={!createdDoc}
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      height: 34, padding: "0 10px",
+                      border: "1px solid var(--border, #d1d5db)", borderRadius: 7,
+                      fontSize: 12.5, color: "var(--text, #111)", background: "#fff",
+                      outline: "none",
+                    }}
+                  />
+                  {coautorResults.length > 0 && (
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
+                      background: "#fff", border: "1px solid var(--border, #d1d5db)",
+                      borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,.10)",
+                      marginTop: 2, maxHeight: 180, overflowY: "auto",
+                    }}>
+                      {coautorResults.map(u => {
+                        const alreadyAdded = coautores.some(c => c.codigoUsuario === u.codigo);
+                        return (
+                          <button
+                            key={u.codigo}
+                            type="button"
+                            disabled={alreadyAdded || addingCoautor}
+                            onMouseDown={() => handleAddCoautor(u)}
+                            style={{
+                              display: "flex", flexDirection: "column", alignItems: "flex-start",
+                              width: "100%", padding: "8px 12px", background: "none",
+                              border: "none", borderBottom: "1px solid var(--border, #f3f4f6)",
+                              cursor: alreadyAdded ? "default" : "pointer",
+                              opacity: alreadyAdded ? 0.5 : 1,
+                              textAlign: "left",
+                            }}
+                            onMouseEnter={e => { if (!alreadyAdded) (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-2, #f9fafb)"; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+                          >
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text, #111)" }}>
+                              {u.nome ?? "—"}
+                            </span>
+                            <span style={{ fontSize: 11, color: "var(--text-3, #6b7280)" }}>
+                              {u.matricula ?? u.cpf ?? ""}
+                              {alreadyAdded ? " · Já adicionado" : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* List of co-autores */}
+                {coautores.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {coautores.map(c => (
+                      <div
+                        key={c.codigoUsuario}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          padding: "6px 10px",
+                          background: "var(--surface-2, #f9fafb)",
+                          border: "1px solid var(--border)", borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{
+                          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                          background: "var(--brand-600, #2563eb)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 10, fontWeight: 700, color: "#fff",
+                        }}>
+                          {(c.nomeUsuario ?? "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, overflow: "hidden" }}>
+                          <div style={{ fontWeight: 600, color: "var(--text, #111)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {c.nomeUsuario ?? `Usuário ${c.codigoUsuario}`}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: "var(--text-3, #6b7280)" }}>{c.papel}</div>
+                        </div>
+                        <button
+                          type="button"
+                          title="Remover co-autor"
+                          disabled={removingCoautor === c.codigoUsuario}
+                          onClick={() => handleRemoveCoautor(c.codigoUsuario)}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            color: "#ef4444", fontSize: 14, lineHeight: 1,
+                            padding: 2, flexShrink: 0, opacity: removingCoautor === c.codigoUsuario ? 0.5 : 1,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {coautores.length === 0 && !coautorQuery && (
+                  <p style={{ fontSize: 12, color: "var(--text-3, #9ca3af)", textAlign: "center", margin: "8px 0" }}>
+                    Nenhum co-autor adicionado
+                  </p>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setShowAnexos(p => !p)}
