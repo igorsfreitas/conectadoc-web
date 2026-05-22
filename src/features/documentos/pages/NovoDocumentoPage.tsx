@@ -438,19 +438,15 @@ function AssuntoComboBox({
           type="text"
           value={open ? query : display}
           placeholder="Digite para filtrar ou selecione..."
-          onFocus={() => { setOpen(true); setQuery(""); }}
           onChange={e => handleInputChange(e.target.value)}
-          style={{
-            ...inputStyle,
-            paddingRight: 36,
-          }}
-          onFocus={(e) => {
+          onFocus={e => {
             setOpen(true);
             setQuery("");
             e.target.style.borderColor = "var(--brand-600, #2563eb)";
           }}
-          onBlur={e => e.target.style.borderColor = "var(--border, #d1d5db)"}
+          onBlur={e => (e.target.style.borderColor = "var(--border, #d1d5db)")}
           autoComplete="off"
+          style={{ ...inputStyle, paddingRight: 36 }}
         />
         <span
           style={{
