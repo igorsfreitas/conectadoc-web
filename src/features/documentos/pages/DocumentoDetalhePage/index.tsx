@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
 import type { DocumentosService } from '../../../../infra/services/documentos/documentos.service';
-import type { AtributoDocumento, CoautorDocumento, ComentarioDocumento, DocumentoDetalhe, DocumentoDetalheAnexo, UsuarioSearchItem } from '../../models/documento.model';
+import type { AtributoDocumento, CoautorDocumento, ComentarioDocumento, DespachoPadrao, DocumentoDetalhe, DocumentoDetalheAnexo, TramitacaoItem, UsuarioPorSegmento, UsuarioSearchItem } from '../../models/documento.model';
 import type { AtributoTipoDocumento } from '../../../tipo-documento/models/tipo-documento.model';
 import s from './style.module.scss';
 
@@ -656,6 +656,550 @@ function IconPlus() {
   );
 }
 
+// ── TramitarDialog ──────────────────────────────────────────────────────────
+
+function TramitarDialog({
+  doc,
+  service,
+  onClose,
+  onSuccess,
+}: {
+  doc: DocumentoDetalhe;
+  service: DocumentosService;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const uaService = useInject('UnidadeAdministrativaService');
+  const [segmentos, setSegmentos] = useState<{ codigo: number; nome: string | null; sigla: string | null }[]>([]);
+  const [destino, setDestino]     = useState<number | ''>('');
+  const [despacho, setDespacho]   = useState('');
+  const [dataLimite, setDataLimite] = useState('');
+  const [sending, setSending]     = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [search, setSearch]       = useState('');
+
+  // Usuários do destino
+  const [usuariosDestino, setUsuariosDestino] = useState<UsuarioPorSegmento[]>([]);
+  const [usuarioPicked, setUsuarioPicked]     = useState<UsuarioPorSegmento | null>(null);
+  const [pickerUsuariosOpen, setPickerUsuariosOpen] = useState(false);
+  const [loadingUsuarios, setLoadingUsuarios] = useState(false);
+
+  // Despachos padrão
+  const [despachosPadrao, setDespachosPadrao]   = useState<DespachoPadrao[]>([]);
+  const [pickerDespachoOpen, setPickerDespachoOpen] = useState(false);
+
+  // Anexar despacho como peça
+  const [anexarDespacho, setAnexarDespacho] = useState(false);
+
+  useEffect(() => {
+    uaService.findAllSimple().then(list => setSegmentos(list)).catch(() => setSegmentos([]));
+    service.listDespachosPadrao().then(setDespachosPadrao).catch(() => setDespachosPadrao([]));
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Quando destino muda → carrega usuários da unidade
+  useEffect(() => {
+    if (!destino) { setUsuariosDestino([]); setUsuarioPicked(null); return; }
+    setLoadingUsuarios(true);
+    setUsuarioPicked(null);
+    service.listUsuariosPorSegmento(Number(destino))
+      .then(setUsuariosDestino)
+      .catch(() => setUsuariosDestino([]))
+      .finally(() => setLoadingUsuarios(false));
+  }, [destino]);
+
+  const filteredSeg = segmentos.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (s.nome ?? '').toLowerCase().includes(q) || (s.sigla ?? '').toLowerCase().includes(q);
+  });
+
+  async function handleTramitar() {
+    if (!destino) { setError('Selecione o destino.'); return; }
+    setSending(true);
+    setError(null);
+    try {
+      await service.tramitar(doc.codigo, {
+        codigoSegmentoDestino: Number(destino),
+        codigoUsuarioDestino:  usuarioPicked?.codigo,
+        despacho:   despacho.trim() || undefined,
+        dataLimite: dataLimite || undefined,
+        tipoDespacho: 'DESPACHO',
+        anexarDespachoComoPeca: anexarDespacho && !!despacho.trim(),
+      });
+      onSuccess();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      setError(err.response?.data?.message ?? 'Erro ao tramitar documento.');
+      setSending(false);
+    }
+  }
+
+  const overlay: React.CSSProperties = {
+    position: 'fixed', inset: 0, zIndex: 300,
+    background: 'rgba(15,23,42,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    backdropFilter: 'blur(3px)',
+  };
+  const modal: React.CSSProperties = {
+    width: '100%', maxWidth: 640, background: '#fff',
+    borderRadius: 16, boxShadow: '0 24px 60px rgba(15,23,42,0.28)',
+    display: 'flex', flexDirection: 'column', overflow: 'hidden',
+  };
+
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={modal} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginBottom: 4 }}>
+            Tramitar documento
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+            {doc.numeroNetdoc ?? doc.numero ?? `Documento #${doc.codigo}`}
+          </div>
+          {doc.segmentoAtualNome && (
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Origem: <strong style={{ color: 'var(--text-2)' }}>{doc.segmentoAtualNome}</strong>
+            </div>
+          )}
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', maxHeight: '60vh' }}>
+
+          {/* Destino */}
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+              Destino <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Pesquisar unidade..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', height: 36, padding: '0 10px', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, marginBottom: 6, outline: 'none', fontFamily: 'inherit' }}
+              onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+              onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+            />
+            <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              {filteredSeg.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'var(--text-3)' }}>Nenhuma unidade encontrada.</div>
+              ) : filteredSeg.map(seg => (
+                <button
+                  key={seg.codigo}
+                  type="button"
+                  onClick={() => setDestino(seg.codigo)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '8px 12px', background: destino === seg.codigo ? 'var(--primary-soft)' : 'transparent',
+                    border: 'none', borderBottom: '1px solid var(--border)', textAlign: 'left', cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {seg.sigla && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: destino === seg.codigo ? 'var(--primary)' : 'var(--surface-2)', color: destino === seg.codigo ? '#fff' : 'var(--text-2)', borderRadius: 4, padding: '2px 6px', flexShrink: 0 }}>
+                      {seg.sigla}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 13, color: destino === seg.codigo ? 'var(--primary)' : 'var(--text)', fontWeight: destino === seg.codigo ? 600 : 400 }}>
+                    {seg.nome ?? seg.sigla}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Usuário destino (opcional) */}
+          {destino && (
+            <div>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+                Usuário destino (opcional)
+              </label>
+              <button
+                type="button"
+                onClick={() => setPickerUsuariosOpen(true)}
+                disabled={loadingUsuarios || usuariosDestino.length === 0}
+                style={{
+                  width: '100%', height: 38, padding: '0 12px', textAlign: 'left',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8,
+                  fontSize: 13, color: usuarioPicked ? 'var(--text)' : 'var(--text-3)',
+                  cursor: loadingUsuarios || usuariosDestino.length === 0 ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}
+              >
+                <span>
+                  {loadingUsuarios ? 'Carregando usuários…'
+                    : usuariosDestino.length === 0 ? 'Nenhum usuário lotado nesta unidade'
+                    : usuarioPicked ? usuarioPicked.nome ?? `Usuário #${usuarioPicked.codigo}`
+                    : 'Selecionar Usuário'}
+                </span>
+                {usuarioPicked && (
+                  <span
+                    onClick={e => { e.stopPropagation(); setUsuarioPicked(null); }}
+                    style={{ color: 'var(--text-3)', fontSize: 16, padding: '0 6px', cursor: 'pointer' }}
+                  >×</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Data Limite */}
+          <div>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>
+              Data limite (opcional — gera pendência)
+            </label>
+            <input
+              type="date"
+              value={dataLimite}
+              onChange={e => setDataLimite(e.target.value)}
+              style={{ height: 38, padding: '0 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit', color: 'var(--text)' }}
+              onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+              onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+            />
+          </div>
+
+          {/* Despacho */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>
+                Conteúdo do despacho (opcional)
+              </label>
+              {despachosPadrao.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPickerDespachoOpen(true)}
+                  style={{
+                    fontSize: 12, padding: '4px 10px', background: 'var(--surface-2)',
+                    border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-2)',
+                    cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
+                  }}
+                >
+                  📋 Despachos Padrão
+                </button>
+              )}
+            </div>
+            <textarea
+              value={despacho}
+              onChange={e => setDespacho(e.target.value)}
+              placeholder="Redija o despacho de encaminhamento..."
+              rows={4}
+              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13.5, fontFamily: 'inherit', lineHeight: 1.5, outline: 'none', color: 'var(--text)', minHeight: 90 }}
+              onFocus={e => (e.target.style.borderColor = 'var(--primary)')}
+              onBlur={e  => (e.target.style.borderColor = 'var(--border)')}
+            />
+            {despacho.trim() && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-2)', marginTop: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={anexarDespacho}
+                  onChange={e => setAnexarDespacho(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: 'pointer' }}
+                />
+                Anexar despacho como peça (PDF) ao documento
+              </label>
+            )}
+          </div>
+
+          {error && (
+            <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--surface-2)' }}>
+          <button
+            style={{ height: 38, padding: '0 18px', background: 'none', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-2)' }}
+            onClick={onClose}
+            disabled={sending}
+          >
+            Cancelar
+          </button>
+          <button
+            style={{ height: 38, padding: '0 22px', background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: sending || !destino ? 'not-allowed' : 'pointer', opacity: sending || !destino ? 0.6 : 1, fontFamily: 'inherit' }}
+            onClick={handleTramitar}
+            disabled={sending || !destino}
+          >
+            {sending ? 'Tramitando…' : '↗ Tramitar documento'}
+          </button>
+        </div>
+
+        {/* Sub-picker: Despachos Padrão */}
+        {pickerDespachoOpen && (
+          <PickerOverlay title="Selecionar Layout do Despacho" onClose={() => setPickerDespachoOpen(false)}>
+            <div style={{ background: '#dde7f2', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>
+              LAYOUT DE DESPACHO
+            </div>
+            {despachosPadrao.map(d => (
+              <button
+                key={d.codigo}
+                type="button"
+                onClick={() => {
+                  setDespacho(d.conteudo
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim());
+                  setPickerDespachoOpen(false);
+                }}
+                style={{
+                  display: 'block', width: '100%', padding: '12px 14px',
+                  background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)',
+                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, color: 'var(--text)', fontWeight: 600,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {d.nome}
+                <div style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-3)', marginTop: 4, lineHeight: 1.4 }}>
+                  {d.conteudo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)}
+                  {d.conteudo.length > 120 ? '…' : ''}
+                </div>
+              </button>
+            ))}
+          </PickerOverlay>
+        )}
+
+        {/* Sub-picker: Usuários */}
+        {pickerUsuariosOpen && (
+          <PickerOverlay title="Usuários" onClose={() => setPickerUsuariosOpen(false)}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', background: '#dde7f2', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>
+              <span>NOME</span>
+              <span>UND</span>
+            </div>
+            {usuariosDestino.map(u => (
+              <button
+                key={u.codigo}
+                type="button"
+                onClick={() => { setUsuarioPicked(u); setPickerUsuariosOpen(false); }}
+                style={{
+                  display: 'grid', gridTemplateColumns: '1.6fr 1fr',
+                  width: '100%', padding: '10px 14px',
+                  background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)',
+                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, color: 'var(--text)',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <span style={{ fontWeight: 500 }}>{u.nome ?? `Usuário #${u.codigo}`}</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 12 }}>
+                  {u.segmentoSigla ?? u.segmentoNome ?? '—'}
+                </span>
+              </button>
+            ))}
+            {usuariosDestino.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+                Nenhum usuário lotado nesta unidade.
+              </div>
+            )}
+          </PickerOverlay>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── PickerOverlay ────────────────────────────────────────────────────────────
+
+function PickerOverlay({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(15,23,42,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 540, maxHeight: '70vh',
+        background: '#fff', borderRadius: 10, overflow: 'hidden',
+        boxShadow: '0 24px 60px rgba(15,23,42,0.4)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          background: '#1f4e79', color: '#fff', padding: '8px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: 13, fontWeight: 600,
+        }}>
+          <span>{title}</span>
+          <button onClick={onClose} style={{
+            background: '#fff', color: '#000', width: 22, height: 22, border: '1px solid #888',
+            cursor: 'pointer', fontSize: 12, fontWeight: 700, lineHeight: '20px', padding: 0,
+          }}>×</button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TramitarSuccessDialog (pós-tramitação) ────────────────────────────────
+
+function TramitarSuccessDialog({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: 'rgba(15,23,42,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#fff', borderRadius: 12, padding: 24, maxWidth: 380,
+        boxShadow: '0 24px 60px rgba(15,23,42,0.4)', textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+          {message}
+        </div>
+        <button onClick={onClose} style={{
+          marginTop: 14, padding: '8px 24px', background: 'var(--primary)',
+          color: '#fff', border: 'none', borderRadius: 8, fontSize: 13,
+          fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+        }}>OK</button>
+      </div>
+    </div>
+  );
+}
+
+// ── TramitacoesTab ───────────────────────────────────────────────────────────
+
+function TramitacoesTab({ docId, service }: { docId: number; service: DocumentosService }) {
+  const [items, setItems]   = useState<TramitacaoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    service.listTramitacoes(docId)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, [docId]);
+
+  function fmtDate(iso: string | null) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+      ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function statusBadge(item: TramitacaoItem) {
+    if (item.flagCancelada === 1) return { label: 'Cancelada', bg: '#fee2e2', color: '#dc2626' };
+    if (item.flagRecusada  === 1) return { label: 'Recusada',  bg: '#fef9c3', color: '#b45309' };
+    if (item.flagAceite    === 1) return { label: 'Aceita',    bg: '#dcfce7', color: '#16a34a' };
+    return { label: 'Em andamento', bg: 'var(--primary-soft)', color: 'var(--primary)' };
+  }
+
+  if (loading) return (
+    <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+      Carregando tramitações…
+    </div>
+  );
+
+  if (items.length === 0) return (
+    <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+      Nenhuma tramitação registrada para este documento.
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Timeline */}
+      <div style={{ position: 'relative', paddingLeft: 32 }}>
+        {/* Vertical line */}
+        <div style={{ position: 'absolute', left: 10, top: 10, bottom: 10, width: 2, background: 'var(--border)' }} />
+
+        {items.map((item, idx) => {
+          const badge = statusBadge(item);
+          return (
+            <div key={item.codigo} style={{ position: 'relative', marginBottom: idx < items.length - 1 ? 20 : 0 }}>
+              {/* Circle */}
+              <div style={{
+                position: 'absolute', left: -28, top: 14,
+                width: 16, height: 16, borderRadius: '50%',
+                background: badge.color, border: '2px solid #fff',
+                boxShadow: '0 0 0 2px ' + badge.color,
+              }} />
+
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+                {/* Row 1: origem → destino + status */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text)', flexWrap: 'wrap' }}>
+                    <span style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px', fontSize: 12 }}>
+                      {item.origemSigla ?? item.origemNome ?? '—'}
+                    </span>
+                    <span style={{ color: 'var(--text-3)', fontSize: 14 }}>→</span>
+                    <span style={{ background: 'var(--primary-soft)', color: 'var(--primary)', borderRadius: 6, padding: '2px 8px', fontSize: 12 }}>
+                      {item.destinoSigla ?? item.destinoNome ?? '—'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 12, background: badge.bg, color: badge.color }}>
+                      {badge.label}
+                    </span>
+                    <a
+                      href={service.grtUrl(item.codigoDocumento, item.codigo)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Gerar GRT (PDF)"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', fontSize: 11.5,
+                        color: 'var(--primary)', textDecoration: 'none', fontWeight: 600,
+                        padding: '3px 8px', border: '1px solid var(--border)',
+                        borderRadius: 12, background: 'var(--surface)',
+                      }}
+                    >
+                      📄 GRT
+                    </a>
+                  </div>
+                </div>
+
+                {/* Row 2: meta */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 12, color: 'var(--text-3)', marginBottom: item.despacho ? 10 : 0 }}>
+                  <span>Enviado em {fmtDate(item.dataEnvio)}</span>
+                  {item.usuarioOrigemNome && <span>por <strong style={{ color: 'var(--text-2)' }}>{item.usuarioOrigemNome}</strong></span>}
+                  {item.usuarioDestinoNome && <span>→ para <strong style={{ color: 'var(--text-2)' }}>{item.usuarioDestinoNome}</strong></span>}
+                  {item.dataLimite && (
+                    <span style={{ color: '#b45309' }}>
+                      Prazo: {new Date(item.dataLimite).toLocaleDateString('pt-BR')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Despacho */}
+                {item.despacho && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8, borderLeft: '3px solid var(--primary)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 6 }}>
+                      {item.tipoDespacho ?? 'Despacho'}
+                    </div>
+                    <div
+                      style={{ fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.6 }}
+                      dangerouslySetInnerHTML={{ __html: item.despacho }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── DocumentoPreview ────────────────────────────────────────────────────────
 
 function DocumentoPreview({
@@ -823,6 +1367,21 @@ export function DocumentoDetalhePage() {
   const [previewAnexo, setPreviewAnexo] = useState<DocumentoDetalheAnexo | null>(null);
   const [atributosTipo, setAtributosTipo] = useState<AtributoTipoDocumento[]>([]);
   const [atributosDoc, setAtributosDoc] = useState<AtributoDocumento[]>([]);
+  const [tramitarOpen, setTramitarOpen] = useState(false);
+  const [tramitacaoAberta, setTramitacaoAberta] = useState<TramitacaoItem | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Carrega tramitação aberta (última em andamento) sempre que o doc mudar
+  const reloadTramitacaoAberta = (codigo: number) => {
+    service.listTramitacoes(codigo)
+      .then(list => {
+        const aberta = [...list].reverse().find(
+          t => t.flagAceite !== 1 && t.flagRecusada !== 1 && t.flagCancelada !== 1,
+        ) ?? null;
+        setTramitacaoAberta(aberta);
+      })
+      .catch(() => setTramitacaoAberta(null));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -838,7 +1397,11 @@ export function DocumentoDetalhePage() {
     setError(null);
     service
       .findById(id)
-      .then(res => { if (!cancelled) setDoc(res); })
+      .then(res => {
+        if (cancelled) return;
+        setDoc(res);
+        reloadTramitacaoAberta(res.codigo);
+      })
       .catch((err: unknown) => {
         if (cancelled) return;
         const e = err as { response?: { status?: number; data?: { message?: string } } };
@@ -906,6 +1469,26 @@ export function DocumentoDetalhePage() {
         />
       )}
 
+      {tramitarOpen && (
+        <TramitarDialog
+          doc={doc}
+          service={service}
+          onClose={() => setTramitarOpen(false)}
+          onSuccess={() => {
+            setTramitarOpen(false);
+            setActiveTab('flow');
+            setSuccessMsg('Tramitação incluída com sucesso.');
+            // Reload doc + tramitação aberta
+            service.findById(doc.codigo).then(setDoc).catch(() => {});
+            reloadTramitacaoAberta(doc.codigo);
+          }}
+        />
+      )}
+
+      {successMsg && (
+        <TramitarSuccessDialog message={successMsg} onClose={() => setSuccessMsg(null)} />
+      )}
+
       {/* Breadcrumb */}
       <div className={s.crumb}>
         <button className={s.backBtn} onClick={() => navigate(-1)}>
@@ -954,6 +1537,47 @@ export function DocumentoDetalhePage() {
             {doc.resumo ?? doc.assuntoDescricao ?? doc.tipoDocumentoNome ?? 'Documento'}
           </h1>
           <p className={s.subTitle}>{subtitulo || '—'}</p>
+
+          {/* Banner TRAMITAÇÃO EM ABERTO */}
+          {tramitacaoAberta && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 12, padding: '12px 16px', marginBottom: 14,
+              background: 'linear-gradient(90deg, oklch(0.96 0.04 60), oklch(0.97 0.02 60))',
+              border: '1px solid oklch(0.85 0.08 60)',
+              borderLeft: '4px solid oklch(0.65 0.18 60)',
+              borderRadius: 10,
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#92400e' }}>
+                  Tramitação em aberto
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                  Tramitado para <strong>{tramitacaoAberta.destinoNome ?? tramitacaoAberta.destinoSigla ?? '—'}</strong>
+                  {tramitacaoAberta.dataEnvio && (
+                    <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>
+                      {' '}em {new Date(tramitacaoAberta.dataEnvio).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <a
+                href={service.grtUrl(doc.codigo, tramitacaoAberta.codigo)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  height: 34, padding: '0 14px',
+                  background: '#fff', border: '1px solid oklch(0.65 0.18 60)',
+                  borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                  color: '#92400e', textDecoration: 'none', cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                📄 Gerar GRT
+              </a>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className={s.tabs}>
@@ -1131,11 +1755,24 @@ export function DocumentoDetalhePage() {
             />
           )}
 
+          {/* Aba Tramitação */}
+          {activeTab === 'flow' && (
+            <div className={s.card}>
+              <div className={s.cardHeader}>
+                <h3 className={s.cardTitle}>Histórico de Tramitação</h3>
+                <button className={s.tab} style={{ fontSize: 12.5, padding: '4px 10px', borderBottom: 'none' }} onClick={() => setTramitarOpen(true)}>
+                  ↗ Tramitar
+                </button>
+              </div>
+              <TramitacoesTab docId={doc.codigo} service={service} />
+            </div>
+          )}
+
           {activeTab === 'comments' && (
             <ComentariosTab docId={doc.codigo} service={service} />
           )}
 
-          {activeTab !== 'overview' && activeTab !== 'anexos' && activeTab !== 'comments' && activeTab !== 'document' && (
+          {activeTab !== 'overview' && activeTab !== 'anexos' && activeTab !== 'comments' && activeTab !== 'document' && activeTab !== 'flow' && (
             <div className={s.card}>
               <p style={{ color: 'var(--text-3)', fontSize: 13, textAlign: 'center', margin: 0, padding: '40px 0' }}>
                 Conteúdo da aba <strong style={{ color: 'var(--text-2)' }}>{TABS.find(t => t.key === activeTab)?.label}</strong> em construção.
@@ -1161,7 +1798,7 @@ export function DocumentoDetalhePage() {
               </button>
             )}
             <button className={s.btnPrimary}><Icon.pen /> Assinar e tramitar</button>
-            <button className={s.btnSecondary}><Icon.arrow /> Tramitar para...</button>
+            <button className={s.btnSecondary} onClick={() => setTramitarOpen(true)}><Icon.arrow /> Tramitar para...</button>
             <button className={s.btnGhost}>Recusar e devolver</button>
           </div>
 

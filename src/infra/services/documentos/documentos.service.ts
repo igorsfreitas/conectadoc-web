@@ -7,9 +7,13 @@ import {
   ComentarioDocumento,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
+  DespachoPadrao,
   DocumentoDetalhe,
   PecaDocumento,
   TipoDocumentoSimples,
+  TramitacaoItem,
+  TramitarDocumentoPayload,
+  UsuarioPorSegmento,
   UpdateDocumentoPayload,
   UpsertAtributosPayload,
   UsuarioSearchItem,
@@ -122,5 +126,33 @@ export class DocumentosService {
 
   async deleteComentario(id: number, comentarioId: number): Promise<void> {
     await this.httpClient.delete(`/v1/documentos/${id}/comentarios/${comentarioId}`);
+  }
+
+  // ── Tramitação ─────────────────────────────────────────────────────────────
+
+  async tramitar(id: number, payload: TramitarDocumentoPayload): Promise<void> {
+    await this.httpClient.post(`/v1/documentos/${id}/tramitar`, payload);
+  }
+
+  async listTramitacoes(id: number): Promise<TramitacaoItem[]> {
+    const res = await this.httpClient.get<TramitacaoItem[]>(`/v1/documentos/${id}/tramitacoes`);
+    return res.data;
+  }
+
+  async listDespachosPadrao(): Promise<DespachoPadrao[]> {
+    const res = await this.httpClient.get<DespachoPadrao[]>(`/v1/documentos/despachos-padrao`);
+    return res.data;
+  }
+
+  async listUsuariosPorSegmento(segmentoId: number): Promise<UsuarioPorSegmento[]> {
+    const res = await this.httpClient.get<UsuarioPorSegmento[]>(
+      `/v1/documentos/usuarios-por-segmento/${segmentoId}`,
+    );
+    return res.data;
+  }
+
+  /** Retorna a URL do GRT em PDF (abre em nova aba). */
+  grtUrl(docId: number, tramId: number): string {
+    return `/v1/documentos/${docId}/tramitacoes/${tramId}/grt`;
   }
 }

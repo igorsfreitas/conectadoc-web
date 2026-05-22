@@ -161,6 +161,49 @@ export interface ComentarioDocumento {
   dataCriacao: string | null;
 }
 
+export interface TramitarDocumentoPayload {
+  codigoSegmentoDestino: number;
+  codigoUsuarioDestino?: number;
+  despacho?: string;
+  dataLimite?: string;
+  tipoDespacho?: string;
+  anexarDespachoComoPeca?: boolean;
+}
+
+export interface DespachoPadrao {
+  codigo: number;
+  nome: string;
+  conteudo: string;
+}
+
+export interface UsuarioPorSegmento {
+  codigo: number;
+  nome: string | null;
+  segmentoCodigo: number;
+  segmentoNome: string | null;
+  segmentoSigla: string | null;
+}
+
+export interface TramitacaoItem {
+  codigo: number;
+  codigoDocumento: number;
+  origemCodigo: number | null;
+  origemSigla: string | null;
+  origemNome: string | null;
+  destinoCodigo: number | null;
+  destinoSigla: string | null;
+  destinoNome: string | null;
+  usuarioOrigemNome: string | null;
+  usuarioDestinoNome: string | null;
+  despacho: string | null;
+  tipoDespacho: string | null;
+  dataEnvio: string | null;
+  dataLimite: string | null;
+  flagAceite: number | null;
+  flagRecusada: number | null;
+  flagCancelada: number | null;
+}
+
 export interface DocumentoDetalhe {
   codigo: number;
   numeroNetdoc: string | null;
