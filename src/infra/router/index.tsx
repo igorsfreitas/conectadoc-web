@@ -21,6 +21,7 @@ import { InicioPage } from "../../features/inicio/pages/InicioPage";
 import { ConfiguracaoPage } from "../../features/configuracao/pages/ConfiguracaoPage";
 import { TipoInteressadosPage } from "../../features/tipoInteressados/pages/tipoInteressados_page";
 import { AdministracaoPage } from "../../features/administracao/pages/AdministracaoPage";
+import { AssinaturasPage } from "../../features/assinatura/pages/AssinaturasPage";
 import { AppLayout } from "../template/app/index";
 import { ProfileManager, ProfileContext } from "../contexts/profile";
 import { afinzAppPaths } from "./paths/afinz_app";
@@ -65,6 +66,7 @@ function ProtectedRoutes() {
         <Route path={afinzAppPaths.configuracao.asRoute} element={<ConfiguracaoPage />} />
         <Route path={afinzAppPaths.tipoInteressados.asRoute} element={<TipoInteressadosPage />} />
         <Route path={afinzAppPaths.administracao.asRoute} element={<AdministracaoPage />} />
+        <Route path={afinzAppPaths.assinaturas.asRoute} element={<AssinaturasPage />} />
       </Route>
       <Route path="*" element={<ServerInstabilityPage />} />
     </Routes>

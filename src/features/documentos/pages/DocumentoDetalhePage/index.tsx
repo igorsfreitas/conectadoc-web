@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInject } from '../../../../infra/hooks/inject';
+import { ProfileContext } from '../../../../infra/contexts/profile';
+import { AssinarDialog } from '../../../assinatura/dialogs/AssinarDialog';
 import type { DocumentosService } from '../../../../infra/services/documentos/documentos.service';
 import type { AtributoDocumento, CoautorDocumento, ComentarioDocumento, DespachoPadrao, DocumentoDetalhe, DocumentoDetalheAnexo, TramitacaoItem, UsuarioPorSegmento, UsuarioSearchItem } from '../../models/documento.model';
 import type { AtributoTipoDocumento } from '../../../tipo-documento/models/tipo-documento.model';
@@ -245,9 +247,11 @@ function AnexoPreviewModal({
 function AnexoRow({
   anexo,
   onPreview,
+  onAssinar,
 }: {
   anexo: DocumentoDetalheAnexo;
   onPreview: (a: DocumentoDetalheAnexo) => void;
+  onAssinar?: (id: number) => void;
 }) {
   const shortExt = (anexo.mime?.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4);
   return (
@@ -276,6 +280,16 @@ function AnexoRow({
           </a>
         ) : (
           <button className={s.dlBtn} disabled title="Baixar"><Icon.dl /></button>
+        )}
+        {onAssinar && (
+          <button
+            className={s.previewBtn}
+            title="Assinar documento"
+            onClick={() => onAssinar(anexo.id)}
+            style={{ fontSize: 12 }}
+          >
+            ✍
+          </button>
         )}
       </div>
     </div>
@@ -1360,11 +1374,13 @@ export function DocumentoDetalhePage() {
   const navigate = useNavigate();
   const service = useInject('DocumentosService');
   const tipoDocService = useInject('TipoDocumentoService');
+  const { profile } = useContext(ProfileContext);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [doc, setDoc] = useState<DocumentoDetalhe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewAnexo, setPreviewAnexo] = useState<DocumentoDetalheAnexo | null>(null);
+  const [assinarTarget, setAssinarTarget] = useState<number | null>(null);
   const [atributosTipo, setAtributosTipo] = useState<AtributoTipoDocumento[]>([]);
   const [atributosDoc, setAtributosDoc] = useState<AtributoDocumento[]>([]);
   const [tramitarOpen, setTramitarOpen] = useState(false);
@@ -1468,6 +1484,14 @@ export function DocumentoDetalhePage() {
           onClose={() => setPreviewAnexo(null)}
         />
       )}
+      <AssinarDialog
+        open={assinarTarget !== null}
+        onClose={() => setAssinarTarget(null)}
+        pecaCodigo={assinarTarget ?? 0}
+        documentoCodigo={doc.codigo}
+        documentoNome={doc.tipoDocumentoNome ?? 'Documento'}
+        userEmail={profile?.usuario.email ?? null}
+      />
 
       {tramitarOpen && (
         <TramitarDialog
@@ -1740,7 +1764,7 @@ export function DocumentoDetalhePage() {
                 </p>
               ) : (
                 doc.anexos.map(a => (
-                  <AnexoRow key={a.id} anexo={a} onPreview={setPreviewAnexo} />
+                  <AnexoRow key={a.id} anexo={a} onPreview={setPreviewAnexo} onAssinar={id => setAssinarTarget(id)} />
                 ))
               )}
             </div>
