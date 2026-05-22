@@ -121,22 +121,80 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/conectadoc_deploy_key
           chmod 600 ~/.ssh/conectadoc_deploy_key
-          ssh-keyscan -T 30 -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts || true
+          for attempt in 1 2 3; do
+            ssh-keyscan -T 30 -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_HOST" && break
+            sleep $((attempt * 5))
+          done >> ~/.ssh/known_hosts || true
 
       - name: Upload release
         run: |
           set -euo pipefail
+          SSH_OPTIONS=(
+            -i ~/.ssh/conectadoc_deploy_key
+            -o StrictHostKeyChecking=accept-new
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -p "$DEPLOY_SSH_PORT"
+          )
+
+          retry() {
+            local attempt=1
+            local max_attempts=5
+
+            until "$@"; do
+              local status=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return "$status"
+              fi
+              echo "SSH command failed, retrying in $((attempt * 15))s (attempt $attempt/$max_attempts)..."
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+            done
+          }
+
           RELEASE_DIR="$DEPLOY_BASE_PATH/apps/web/releases/$RELEASE_ID"
-          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+
+          upload_archive() {
+            tar -czf - dist Dockerfile nginx.conf docker-compose.deploy.yml | ssh "${SSH_OPTIONS[@]}" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+              "tar -xzf - -C '$RELEASE_DIR'"
+          }
+
+          retry ssh "${SSH_OPTIONS[@]}" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "mkdir -p '$RELEASE_DIR'"
-          tar -czf - dist Dockerfile nginx.conf docker-compose.deploy.yml | ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
-            "tar -xzf - -C '$RELEASE_DIR'"
+          retry upload_archive
 
       - name: Run Docker Compose
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
-            "DEPLOY_BASE_PATH='$DEPLOY_BASE_PATH' RELEASE_ID='$RELEASE_ID' DOCKER_NETWORK='$DOCKER_NETWORK' bash -s" <<'REMOTE'
+          SSH_OPTIONS=(
+            -i ~/.ssh/conectadoc_deploy_key
+            -o StrictHostKeyChecking=accept-new
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -p "$DEPLOY_SSH_PORT"
+          )
+
+          retry() {
+            local attempt=1
+            local max_attempts=5
+
+            until "$@"; do
+              local status=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return "$status"
+              fi
+              echo "SSH command failed, retrying in $((attempt * 15))s (attempt $attempt/$max_attempts)..."
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+            done
+          }
+
+          REMOTE_SCRIPT="$(mktemp)"
+          cat > "$REMOTE_SCRIPT" <<'REMOTE'
           set -euo pipefail
           APP_DIR="$DEPLOY_BASE_PATH/apps/web"
           RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
@@ -152,11 +210,47 @@ jobs:
           ) 9>"$LOCK_FILE"
           REMOTE
 
+          run_remote_compose() {
+            ssh "${SSH_OPTIONS[@]}" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+              "DEPLOY_BASE_PATH='$DEPLOY_BASE_PATH' RELEASE_ID='$RELEASE_ID' DOCKER_NETWORK='$DOCKER_NETWORK' bash -s" < "$REMOTE_SCRIPT"
+          }
+
+          retry run_remote_compose
+
       - name: Verify container
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
-            "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"
+          SSH_OPTIONS=(
+            -i ~/.ssh/conectadoc_deploy_key
+            -o StrictHostKeyChecking=accept-new
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -p "$DEPLOY_SSH_PORT"
+          )
+
+          retry() {
+            local attempt=1
+            local max_attempts=5
+
+            until "$@"; do
+              local status=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return "$status"
+              fi
+              echo "SSH command failed, retrying in $((attempt * 15))s (attempt $attempt/$max_attempts)..."
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+            done
+          }
+
+          check_container() {
+            ssh "${SSH_OPTIONS[@]}" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+              "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"
+          }
+
+          retry check_container
 
       - name: Notify Telegram new version
         continue-on-error: true
