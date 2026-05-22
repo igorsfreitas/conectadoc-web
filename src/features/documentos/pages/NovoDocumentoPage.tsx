@@ -1740,23 +1740,3 @@ function SummaryLine({ label, value, mono }: { label: string; value: React.React
     </div>
   );
 }
-
-function SidebarBtn({ icon, children }: { icon: string; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      title="Em breve"
-      style={{
-        display: "flex", alignItems: "center", gap: 10,
-        height: 36, padding: "0 12px",
-        background: "var(--surface-2, #f9fafb)",
-        border: "1px solid var(--border, #e5e7eb)",
-        borderRadius: 8, fontSize: 13, color: "var(--text-2, #374151)",
-        cursor: "pointer", textAlign: "left",
-      }}
-    >
-      <span>{icon}</span>
-      <span>{children}</span>
-    </button>
-  );
-}
