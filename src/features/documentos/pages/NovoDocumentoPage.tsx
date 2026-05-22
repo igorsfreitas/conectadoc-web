@@ -544,7 +544,7 @@ export function NovoDocumentoPage() {
     if (step === 2) {
       docService.findTiposInterno().then(setTipos).catch(() => {});
       uaService.findAllSimple().then((d: Segmento[]) => setSegmentos(d)).catch(() => {});
-      assuntosService.findAll(1, 500).then(r => setAssuntos(r.data)).catch(() => {});
+      assuntosService.findAll(1, 500).then(r => setAssuntos(r.data)).catch(console.error);
     }
   }, [step]);
 
