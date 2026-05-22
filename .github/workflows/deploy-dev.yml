@@ -158,46 +158,41 @@ jobs:
           ssh -i ~/.ssh/conectadoc_deploy_key -o StrictHostKeyChecking=accept-new -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
             "for i in \$(seq 1 20); do status=\$(docker inspect --format='{{.State.Health.Status}}' conectadoc-web 2>/dev/null || true); [ \"\$status\" = healthy ] && exit 0; echo \"web health: \$status\"; sleep 3; done; docker logs --tail=80 conectadoc-web; exit 1"
 
-      - name: Notify WhatsApp new version
+      - name: Notify Telegram new version
         continue-on-error: true
         env:
-          WHATSAPP_API_URL: ${{ secrets.WHATSAPP_API_URL }}
-          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
-          WHATSAPP_INSTANCE: ${{ secrets.WHATSAPP_INSTANCE }}
-          WHATSAPP_RECIPIENTS: "+5581988145555,+5581981154380"
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_IDS }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL || format('http://{0}', secrets.DEPLOY_SSH_HOST) }}
         run: |
           set -euo pipefail
 
-          if [ -z "${WHATSAPP_API_URL:-}" ] || [ -z "${WHATSAPP_API_KEY:-}" ] || [ -z "${WHATSAPP_INSTANCE:-}" ]; then
-            echo "WhatsApp notification skipped: configure WHATSAPP_API_URL, WHATSAPP_API_KEY and WHATSAPP_INSTANCE."
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_IDS:-}" ]; then
+            echo "Telegram notification skipped: configure TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS."
             exit 0
           fi
 
-          API_URL="${WHATSAPP_API_URL%/}"
-          ENDPOINT="$API_URL/message/sendText/$WHATSAPP_INSTANCE"
           MESSAGE="Nova versão do ConectaDoc Web publicada em DEV.
           Versão: $RELEASE_VERSION
           Commit: ${GITHUB_SHA::7}
           URL: $PUBLIC_URL"
 
           FAILED=0
-          IFS=',' read -ra RECIPIENTS <<< "$WHATSAPP_RECIPIENTS"
-          for RAW_NUMBER in "${RECIPIENTS[@]}"; do
-            NUMBER="$(printf '%s' "$RAW_NUMBER" | tr -cd '0-9')"
-            if [ -z "$NUMBER" ]; then
+          IFS=',' read -ra CHAT_IDS <<< "$TELEGRAM_CHAT_IDS"
+          for RAW_CHAT_ID in "${CHAT_IDS[@]}"; do
+            CHAT_ID="$(printf '%s' "$RAW_CHAT_ID" | xargs)"
+            if [ -z "$CHAT_ID" ]; then
               continue
             fi
 
-            PAYLOAD="$(NUMBER="$NUMBER" MESSAGE="$MESSAGE" node -e 'console.log(JSON.stringify({ number: process.env.NUMBER, text: process.env.MESSAGE }))')"
+            PAYLOAD="$(CHAT_ID="$CHAT_ID" MESSAGE="$MESSAGE" node -e 'console.log(JSON.stringify({ chat_id: process.env.CHAT_ID, text: process.env.MESSAGE, disable_web_page_preview: true }))')"
             if curl --fail --show-error --silent \
-              -X POST "$ENDPOINT" \
+              -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               -H "Content-Type: application/json" \
-              -H "apikey: $WHATSAPP_API_KEY" \
               --data "$PAYLOAD" > /dev/null; then
-              echo "WhatsApp notification sent to $NUMBER"
+              echo "Telegram notification sent to $CHAT_ID"
             else
-              echo "::warning::Failed to send WhatsApp notification to $NUMBER"
+              echo "::warning::Failed to send Telegram notification to $CHAT_ID"
               FAILED=1
             fi
           done

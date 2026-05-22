@@ -107,9 +107,8 @@ Cadastre:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` |
 | `WEB_ENV_FILE` | variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada com acesso aos pacotes `@afinz/*` |
-| `WHATSAPP_API_URL` | `http://187.77.7.7/wpp` |
-| `WHATSAPP_API_KEY` | chave/token da API de WhatsApp |
-| `WHATSAPP_INSTANCE` | instancia/sessao usada para envio |
+| `TELEGRAM_BOT_TOKEN` | token do bot criado no BotFather |
+| `TELEGRAM_CHAT_IDS` | IDs de usuarios/grupos/canais, separados por virgula |
 
 Para copiar a chave privada de deploy:
 
@@ -123,7 +122,9 @@ Em `Settings > Secrets and variables > Actions > Variables`, cadastre tambem:
 | --- | --- |
 | `PUBLIC_URL` | URL publica do frontend, por exemplo `http://187.77.7.7` |
 
-O workflow envia aviso de nova versao para `+5581988145555` e `+5581981154380` depois que o container do Web fica saudavel. Se os secrets de WhatsApp nao estiverem configurados, o deploy nao falha; apenas registra que a notificacao foi ignorada. Se a API de WhatsApp ficar privada na maquina DEV, exponha-a via reverse proxy/firewall somente para o necessario ou adapte o passo para executar o `curl` via SSH.
+O workflow envia aviso de nova versao via Telegram depois que o container do Web fica saudavel. Se os secrets de Telegram nao estiverem configurados, o deploy nao falha; apenas registra que a notificacao foi ignorada.
+
+Para descobrir o `TELEGRAM_CHAT_IDS`, crie um bot no `@BotFather`, envie uma mensagem para ele ou adicione-o ao grupo/canal desejado, e acesse `https://api.telegram.org/bot<TOKEN>/getUpdates`. Use o valor de `chat.id`; mais de um destino pode ser separado por virgula.
 
 ## 4. Configurar WEB_ENV_FILE
 

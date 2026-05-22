@@ -100,9 +100,8 @@ Cadastre em `Settings > Secrets and variables > Actions > Secrets`:
 | `DEPLOY_BASE_PATH` | `/opt/conectadoc` | Diretorio base criado pela infra |
 | `WEB_ENV_FILE` | conteudo do `.env.production` | Variaveis Vite usadas no build |
 | `BITBUCKET_SSH_KEY` | chave privada Bitbucket | Acesso de leitura aos pacotes privados `@afinz/*` |
-| `WHATSAPP_API_URL` | `http://187.77.7.7/wpp` | URL base da Evolution API publicada pela infra |
-| `WHATSAPP_API_KEY` | token da API | Chave usada para enviar mensagens |
-| `WHATSAPP_INSTANCE` | `conectadoc` | Instancia/sessao de WhatsApp usada para envio |
+| `TELEGRAM_BOT_TOKEN` | token do BotFather | Token do bot usado para avisar nova release |
+| `TELEGRAM_CHAT_IDS` | `123456789,-1001234567890` | IDs de usuarios/grupos/canais, separados por virgula |
 
 Tambem configure em `Settings > Secrets and variables > Actions > Variables`:
 
@@ -117,7 +116,14 @@ VITE_APP_BASE_URL=/api
 VITE_APP_OPEN_SEARCH_URL=
 ```
 
-O envio de WhatsApp acontece depois que o container `conectadoc-web` fica saudavel. Por padrao, a mensagem e enviada para `+5581988145555` e `+5581981154380`. Se os secrets `WHATSAPP_API_URL`, `WHATSAPP_API_KEY` e `WHATSAPP_INSTANCE` nao estiverem configurados, o deploy continua e a notificacao e ignorada. Se a API de WhatsApp ficar privada na maquina DEV, exponha-a via reverse proxy/firewall somente para o necessario ou adapte o passo para executar o `curl` via SSH.
+O envio de Telegram acontece depois que o container `conectadoc-web` fica saudavel. Se os secrets `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_IDS` nao estiverem configurados, o deploy continua e a notificacao e ignorada.
+
+Para obter os dados do Telegram:
+
+1. Crie um bot no `@BotFather` e cadastre o token em `TELEGRAM_BOT_TOKEN`.
+2. Envie uma mensagem para o bot ou adicione o bot ao grupo/canal desejado.
+3. Acesse `https://api.telegram.org/bot<TOKEN>/getUpdates` e copie o campo `chat.id`.
+4. Cadastre um ou mais IDs em `TELEGRAM_CHAT_IDS`, separados por virgula.
 
 ### Como executar
 
@@ -140,7 +146,7 @@ O envio de WhatsApp acontece depois que o container `conectadoc-web` fica saudav
 - executa `docker compose -f docker-compose.deploy.yml build`;
 - executa `docker compose -f docker-compose.deploy.yml up -d --remove-orphans`;
 - valida o health check do container `conectadoc-web`.
-- envia uma mensagem de WhatsApp avisando a nova versao publicada, quando os secrets de WhatsApp estiverem configurados.
+- envia uma mensagem de Telegram avisando a nova versao publicada, quando os secrets de Telegram estiverem configurados.
 
 ### Versao publicada
 
