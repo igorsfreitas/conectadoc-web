@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -84,6 +86,50 @@ jobs:
           }
           EOF
 
+      - name: Write release notes
+        run: |
+          set -euo pipefail
+          git log -10 --pretty=format:'%h%x09%s' > release-commits.raw
+          node <<'NODE'
+          const fs = require('fs');
+
+          const labels = {
+            feat: 'Funcionalidade',
+            fix: 'Correção',
+            docs: 'Documentação',
+            ci: 'Pipeline',
+            chore: 'Manutenção',
+            refactor: 'Refatoração',
+            perf: 'Performance',
+            test: 'Testes',
+            build: 'Build',
+            style: 'Estilo',
+            revert: 'Reversão',
+          };
+
+          const lines = fs.readFileSync('release-commits.raw', 'utf8')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const notes = lines.map((line, index) => {
+            const [hash, ...subjectParts] = line.split('\t');
+            const subject = subjectParts.join('\t');
+            const match = subject.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+
+            if (!match) {
+              return `${index + 1}. Alteração: ${subject} (${hash})`;
+            }
+
+            const [, type, scope, description] = match;
+            const label = labels[type.toLowerCase()] || type;
+            const scopedLabel = scope ? `${label} (${scope})` : label;
+            return `${index + 1}. ${scopedLabel}: ${description} (${hash})`;
+          });
+
+          fs.writeFileSync('release-notes.txt', notes.join('\n') || 'Sem commits recentes.');
+          NODE
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v6
         with:
@@ -93,6 +139,7 @@ jobs:
             Dockerfile
             nginx.conf
             docker-compose.deploy.yml
+            release-notes.txt
           if-no-files-found: error
 
   deploy:
@@ -266,10 +313,21 @@ jobs:
             exit 0
           fi
 
-          MESSAGE="Nova versão do ConectaDoc Web publicada em DEV.
+          RELEASE_NOTES="Sem commits recentes."
+          if [ -f release-notes.txt ]; then
+            RELEASE_NOTES="$(cat release-notes.txt)"
+          fi
+
+          MESSAGE="$(cat <<EOF
+          Nova versão do ConectaDoc Web publicada em DEV.
           Versão: $RELEASE_VERSION
           Commit: ${GITHUB_SHA::7}
-          URL: $PUBLIC_URL"
+          URL: $PUBLIC_URL
+
+          Últimas mudanças:
+          $RELEASE_NOTES
+          EOF
+          )"
 
           FAILED=0
           IFS=',' read -ra CHAT_IDS <<< "$TELEGRAM_CHAT_IDS"
