@@ -1,5 +1,62 @@
 export type CaixaTab = 'entrada' | 'saida' | 'posse' | 'pendencia' | 'circular' | 'gerencia';
 
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+
+export interface DashboardCounts {
+  posse: number;
+  entrada: number;
+  aguardandoAssinatura: number;
+  tramitadosMes: number;
+}
+
+export interface DashboardAtividade {
+  tramitacaoCodigo: number | null;
+  documentoCodigo: number;
+  numeroNetdoc: string | null;
+  numero: string | null;
+  resumo: string | null;
+  tipoDocumentoSigla: string | null;
+  tipoDocumentoNome: string | null;
+  origemSigla: string | null;
+  destinoSigla: string | null;
+  flagPendencia: number | null;
+  dataEnvio: string | null;
+}
+
+export interface DashboardPendenteAssinatura {
+  codigo: number;
+  documentoCodigo: number | null;
+  numeroNetdoc: string | null;
+  tipoDocumentoNome: string | null;
+  tipoDocumentoSigla: string | null;
+  resumo: string | null;
+  modalidade: string;
+  status: string;
+  dataAssinatura: string | null;
+}
+
+export interface DashboardSituacao {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface DashboardVolumeDiario {
+  day: string;
+  date: string;
+  count: number;
+}
+
+export interface DashboardData {
+  counts: DashboardCounts;
+  atividades: DashboardAtividade[];
+  pendentesAssinatura: DashboardPendenteAssinatura[];
+  tramitacoesPorSituacao: DashboardSituacao[];
+  volumeDiario: DashboardVolumeDiario[];
+  nomeUsuario: string | null;
+  segmentoSigla: string | null;
+}
+
 /** Tipo do campo: 1=STRING, 2=STRING HTML, 3=DATE, 4=INTEGER, 5=NUMERIC, 6=ASSOCIAÇÃO, 7=MULTI VALORADO, 8=BOOLEAN */
 export type AtributoTipoEnum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 

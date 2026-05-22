@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AtributoTipoDocumento } from "../../tipo-documento/models/tipo-documento.model";
+import { Assunto } from "../../assuntos/models/assunto.model";
 import { useInject } from "../../../infra/hooks/inject";
 import { afinzAppPaths } from "../../../infra/router/paths/afinz_app";
 import { CreateDocumentoResponse, PecaDocumento, TipoDocumentoSimples } from "../models/documento.model";
@@ -376,12 +377,136 @@ function EditFieldDialog({
 }
 
 
+// ── Assunto Combo Box ─────────────────────────────────────────────────────────
+function AssuntoComboBox({
+  assuntos,
+  value,
+  onChange,
+}: {
+  assuntos: Assunto[];
+  value: number | null;
+  onChange: (codigo: number | null, descricao: string) => void;
+}) {
+  const [query,    setQuery]    = useState("");
+  const [open,     setOpen]     = useState(false);
+  const [display,  setDisplay]  = useState("");
+  const containerRef            = useRef<HTMLDivElement>(null);
+
+  // Sync display label when value changes externally
+  useEffect(() => {
+    if (value === null) { setDisplay(""); return; }
+    const found = assuntos.find(a => a.codigo === value);
+    if (found) setDisplay(found.descricao ?? String(found.codigo));
+  }, [value, assuntos]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        // Reset query when closing without selection
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = query.trim()
+    ? assuntos.filter(a => (a.descricao ?? "").toUpperCase().includes(query.toUpperCase()))
+    : assuntos;
+
+  function select(a: Assunto) {
+    const label = a.descricao ?? String(a.codigo);
+    setDisplay(label);
+    setQuery("");
+    setOpen(false);
+    onChange(a.codigo, label);
+  }
+
+  function handleInputChange(v: string) {
+    setQuery(v);
+    setDisplay(v);
+    if (!open) setOpen(true);
+    if (!v) onChange(null, "");
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          value={open ? query : display}
+          placeholder="Digite para filtrar ou selecione..."
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          onChange={e => handleInputChange(e.target.value)}
+          style={{
+            ...inputStyle,
+            paddingRight: 36,
+          }}
+          onFocus={(e) => {
+            setOpen(true);
+            setQuery("");
+            e.target.style.borderColor = "var(--brand-600, #2563eb)";
+          }}
+          onBlur={e => e.target.style.borderColor = "var(--border, #d1d5db)"}
+          autoComplete="off"
+        />
+        <span
+          style={{
+            position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+            pointerEvents: "none", color: "var(--text-3, #9ca3af)", fontSize: 10,
+          }}
+        >
+          {open ? "▲" : "▼"}
+        </span>
+      </div>
+
+      {open && (
+        <div style={{
+          position: "absolute", left: 0, right: 0, top: "calc(100% + 4px)",
+          background: "#fff", border: "1px solid var(--border, #d1d5db)",
+          borderRadius: 8, zIndex: 100,
+          maxHeight: 240, overflowY: "auto",
+          boxShadow: "0 8px 24px rgba(15,23,42,.12)",
+        }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--text-3, #9ca3af)", fontStyle: "italic" }}>
+              Nenhum assunto encontrado
+            </div>
+          ) : (
+            filtered.map(a => (
+              <button
+                key={a.codigo}
+                type="button"
+                onMouseDown={e => { e.preventDefault(); select(a); }}
+                style={{
+                  display: "block", width: "100%", padding: "9px 14px",
+                  textAlign: "left", background: "transparent",
+                  border: "none", borderBottom: "1px solid var(--surface-2, #f3f4f6)",
+                  fontSize: 13.5, color: "var(--text, #111)", cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2, #f9fafb)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              >
+                {a.descricao ?? `Assunto ${a.codigo}`}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export function NovoDocumentoPage() {
   const navigate         = useNavigate();
   const docService       = useInject("DocumentosService");
   const tipoDocService   = useInject("TipoDocumentoService");
   const uaService        = useInject("UnidadeAdministrativaService");
+  const assuntosService  = useInject("AssuntosService");
 
   // Step control
   const [step, setStep]         = useState<1 | 2 | 3>(1);
@@ -390,11 +515,12 @@ export function NovoDocumentoPage() {
   // Data fetched
   const [tipos,     setTipos]     = useState<TipoDocumentoSimples[]>([]);
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
+  const [assuntos,  setAssuntos]  = useState<Assunto[]>([]);
 
   // Step 2 fields
   const [codigoTipo,             setCodigoTipo]             = useState<number | null>(null);
   const [codigoSegmentoCriador,  setCodigoSegmentoCriador]  = useState<number | null>(null);
-  const [assunto,                setAssunto]                = useState("");
+  const [codigoAssunto,          setCodigoAssunto]          = useState<number | null>(null);
   const [codigoEstado,           setCodigoEstado]           = useState<number>(1);
   const [flagExpedienteImpresso, setFlagExpedienteImpresso] = useState<0 | 1>(0);
   const [flagConfidencial,       setFlagConfidencial]       = useState(false);
@@ -422,6 +548,7 @@ export function NovoDocumentoPage() {
     if (step === 2) {
       docService.findTiposInterno().then(setTipos).catch(() => {});
       uaService.findAllSimple().then((d: Segmento[]) => setSegmentos(d)).catch(() => {});
+      assuntosService.findAll(1, 500).then(r => setAssuntos(r.data)).catch(() => {});
     }
   }, [step]);
 
@@ -465,7 +592,7 @@ export function NovoDocumentoPage() {
     setError(null);
     try {
       await docService.atualizar(createdDoc.codigo, {
-        resumo:                 assunto.trim() || undefined,
+        codigoAssunto:          codigoAssunto ?? undefined,
         codigoEstado,
         flagExpedienteImpresso,
         codigoSegmentoCriador:  codigoSegmentoCriador ?? undefined,
@@ -619,7 +746,7 @@ export function NovoDocumentoPage() {
           </div>
           <button
             style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--text-2)", background: "none", border: "none", cursor: "pointer" }}
-            onClick={() => { setStep(1); setCreatedDoc(null); setCodigoTipo(null); setError(null); }}
+            onClick={() => { setStep(1); setCreatedDoc(null); setCodigoTipo(null); setCodigoAssunto(null); setError(null); }}
           >
             ‹ Voltar
           </button>
@@ -673,20 +800,18 @@ export function NovoDocumentoPage() {
 
           {/* Assunto */}
           <div style={{ marginBottom: 16 }}>
-            <label style={fieldLabel}>Assunto <span style={{ color: "#ef4444" }}>*</span></label>
-            <textarea
-              value={assunto}
-              onChange={e => setAssunto(e.target.value)}
-              placeholder="Descreva o assunto deste documento..."
-              rows={3}
-              style={{
-                width: "100%", boxSizing: "border-box", resize: "vertical",
-                border: "1px solid var(--border, #d1d5db)", borderRadius: 8,
-                padding: "10px 12px", fontSize: 14, fontFamily: "inherit",
-                lineHeight: 1.5, outline: "none", color: "var(--text, #111)",
-              }}
-              onFocus={e => (e.target.style.borderColor = "var(--brand-600, #2563eb)")}
-              onBlur={e  => (e.target.style.borderColor = "var(--border, #d1d5db)")}
+            <label style={fieldLabel}>
+              Assunto <span style={{ color: "#ef4444" }}>*</span>
+              {assuntos.length > 0 && (
+                <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-3, #9ca3af)", fontWeight: 400 }}>
+                  {assuntos.length} opções disponíveis
+                </span>
+              )}
+            </label>
+            <AssuntoComboBox
+              assuntos={assuntos}
+              value={codigoAssunto}
+              onChange={(codigo) => setCodigoAssunto(codigo)}
             />
           </div>
 

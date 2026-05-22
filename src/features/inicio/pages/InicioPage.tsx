@@ -1,183 +1,39 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useInject } from '../../../infra/hooks/inject';
+import {
+  DashboardData,
+  DashboardAtividade,
+  DashboardPendenteAssinatura,
+} from '../../documentos/models/documento.model';
 import s from './style.module.scss';
 
-// ── Mock data ──────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-const STATS = [
-  {
-    label: 'Em sua posse',
-    value: 109,
-    delta: '+12 vs. semana anterior',
-    up: true,
-    iconColor: '#eff6ff',
-    iconStroke: '#3b82f6',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Caixa de entrada',
-    value: 3,
-    delta: '+3 vs. semana anterior',
-    up: true,
-    iconColor: '#fff7ed',
-    iconStroke: '#f97316',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
-        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Aguardando assinatura',
-    value: 7,
-    delta: '-2 vs. semana anterior',
-    up: false,
-    iconColor: '#f0fdf4',
-    iconStroke: '#22c55e',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M12 20h9"/>
-        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-      </svg>
-    ),
-  },
-  {
-    label: 'Tramitados (mês)',
-    value: 234,
-    delta: '+18% vs. semana anterior',
-    up: true,
-    iconColor: '#faf5ff',
-    iconStroke: '#a855f7',
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="17 1 21 5 17 9"/>
-        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-        <polyline points="7 23 3 19 7 15"/>
-        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-      </svg>
-    ),
-  },
-];
+function relativeTime(iso: string | null): string {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1)   return 'agora';
+  if (mins < 60)  return `há ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `há ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `há ${days} d`;
+}
 
 type StatusKey = 'urgente' | 'pendente' | 'tramitacao';
 
-interface ActivityItem {
-  id: string;
-  numero: string;
-  sigla1: string;
-  unidade1: string;
-  status: StatusKey;
-  titulo: string;
-  tempo: string;
-  de: string;
-  para: string;
+function itemStatus(item: DashboardAtividade): StatusKey {
+  if (item.flagPendencia === 1) return 'pendente';
+  return 'tramitacao';
 }
-
-const ACTIVITY: ActivityItem[] = [
-  {
-    id: '1',
-    numero: '2017.49968',
-    sigla1: 'SD',
-    unidade1: 'SDRMA',
-    status: 'urgente',
-    titulo: 'EMPENHO — Material de expediente',
-    tempo: 'há 4 min',
-    de: 'DEPFIN',
-    para: 'SEGOV',
-  },
-  {
-    id: '2',
-    numero: '2017.49955',
-    sigla1: 'SD',
-    unidade1: 'SDRMA',
-    status: 'pendente',
-    titulo: 'DIÁRIAS DE VIAGEM — Capacitação Recife',
-    tempo: 'há 22 min',
-    de: 'DEPFIN',
-    para: 'SEGOV',
-  },
-  {
-    id: '3',
-    numero: '2017.49946',
-    sigla1: 'SD',
-    unidade1: 'SDRMA',
-    status: 'tramitacao',
-    titulo: 'DIÁRIAS DE VIAGEM — Reunião CIDES',
-    tempo: 'há 1 h',
-    de: 'DEPFIN',
-    para: 'SEGOV',
-  },
-  {
-    id: '4',
-    numero: '2025.18243',
-    sigla1: 'SE',
-    unidade1: 'SEAD',
-    status: 'tramitacao',
-    titulo: 'ASSINATURA DE CONTRATO 0723/2025',
-    tempo: 'há 3 h',
-    de: 'CGM',
-    para: 'SEGOV',
-  },
-];
-
-type SignStatusKey = 'pendente';
-
-interface SignItem {
-  id: string;
-  ref: string;
-  desc: string;
-  solicitante: string;
-  status: SignStatusKey;
-}
-
-const SIGN_ITEMS: SignItem[] = [
-  {
-    id: '1',
-    ref: 'Proc. Adm. 0007/2026',
-    desc: 'Ata da Reunião do Conselho — 09/05',
-    solicitante: 'Diretor de TI',
-    status: 'pendente',
-  },
-  {
-    id: '2',
-    ref: 'Proc. Adm. 0006/2026',
-    desc: 'Ofício 050/2026 — Resposta SEMURB',
-    solicitante: 'Secretário SEAD',
-    status: 'pendente',
-  },
-  {
-    id: '3',
-    ref: 'Of. 1257/2026',
-    desc: 'Solicitação de Liberação Orçamentária',
-    solicitante: 'SEFIN',
-    status: 'pendente',
-  },
-];
-
-const BAR_DATA = [
-  { label: 'Em tramitação', value: 87, pct: 87, color: 'var(--info-500)' },
-  { label: 'Pendente',       value: 52, pct: 52, color: 'var(--warning-500)' },
-  { label: 'Concluído',      value: 71, pct: 71, color: 'var(--success-500)' },
-  { label: 'Arquivado',      value: 24, pct: 24, color: 'var(--text-3)' },
-];
-
-const VOL_DATA = [
-  { day: 'Seg', count: 28 },
-  { day: 'Ter', count: 45 },
-  { day: 'Qua', count: 37 },
-  { day: 'Qui', count: 62 },
-  { day: 'Sex', count: 41 },
-];
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: StatusKey }) {
-  if (status === 'urgente')    return <span className={`${s.badge} ${s.badgeUrgent}`}><Dot />Urgente</span>;
-  if (status === 'pendente')   return <span className={`${s.badge} ${s.badgePending}`}><Dot />Pendente</span>;
+  if (status === 'urgente')  return <span className={`${s.badge} ${s.badgeUrgent}`}><Dot />Urgente</span>;
+  if (status === 'pendente') return <span className={`${s.badge} ${s.badgePending}`}><Dot />Pendente</span>;
   return <span className={`${s.badge} ${s.badgeInProgress}`}><Dot />Em tramitação</span>;
 }
 
@@ -210,21 +66,122 @@ function DocIcon() {
   );
 }
 
+function Skeleton({ w = '100%', h = 16, r = 6 }: { w?: string | number; h?: number; r?: number }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
+      backgroundSize: '200% 100%',
+      animation: 'shimmer 1.4s infinite',
+    }} />
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
+const STAT_ICONS = [
+  {
+    label: 'Em sua posse',
+    iconColor: '#eff6ff', iconStroke: '#3b82f6',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
+  },
+  {
+    label: 'Caixa de entrada',
+    iconColor: '#fff7ed', iconStroke: '#f97316',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+      </svg>
+    ),
+  },
+  {
+    label: 'Aguardando assinatura',
+    iconColor: '#f0fdf4', iconStroke: '#22c55e',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+      </svg>
+    ),
+  },
+  {
+    label: 'Tramitados (mês)',
+    iconColor: '#faf5ff', iconStroke: '#a855f7',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <polyline points="17 1 21 5 17 9"/>
+        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+        <polyline points="7 23 3 19 7 15"/>
+        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+      </svg>
+    ),
+  },
+];
+
 export function InicioPage() {
-  const navigate = useNavigate();
-  const maxVol = Math.max(...VOL_DATA.map(d => d.count));
+  const navigate      = useNavigate();
+  const docService    = useInject('DocumentosService');
+
+  const [data,    setData]    = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    docService
+      .getDashboard()
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => { setError('Não foi possível carregar os dados.'); setLoading(false); });
+  }, []);
+
+  const counts = data?.counts;
+  const statValues = [
+    counts?.posse              ?? 0,
+    counts?.entrada            ?? 0,
+    counts?.aguardandoAssinatura ?? 0,
+    counts?.tramitadosMes      ?? 0,
+  ];
+
+  const maxVol = data
+    ? Math.max(...data.volumeDiario.map(d => d.count), 1)
+    : 1;
+
+  const maxSit = data
+    ? Math.max(...data.tramitacoesPorSituacao.map(r => r.value), 1)
+    : 1;
+
+  const nomeUsuario = data?.nomeUsuario
+    ? data.nomeUsuario.split(' ')[0]   // first name only
+    : 'usuário';
+
+  const urgentes  = counts?.entrada ?? 0;
+  const pendentes = counts?.aguardandoAssinatura ?? 0;
 
   return (
     <div className={s.page}>
+      {/* shimmer keyframe */}
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
 
       {/* Header */}
       <div className={s.header}>
         <div className={s.headerLeft}>
-          <h1>Bem-vindo, Grimalde 👋</h1>
+          <h1>Bem-vindo, {nomeUsuario} 👋</h1>
           <p>
-            Você tem <strong>3 documentos urgentes</strong> e <strong>7 assinaturas pendentes</strong>.
+            {loading ? (
+              <Skeleton w={300} h={14} />
+            ) : (
+              <>
+                Você tem{' '}
+                <strong>{urgentes} documento{urgentes !== 1 ? 's' : ''} na entrada</strong>
+                {pendentes > 0 && (
+                  <> e <strong>{pendentes} assinatura{pendentes !== 1 ? 's' : ''} pendente{pendentes !== 1 ? 's' : ''}</strong></>
+                )}.
+              </>
+            )}
           </p>
         </div>
         <div className={s.headerActions}>
@@ -246,23 +203,30 @@ export function InicioPage() {
         </div>
       </div>
 
+      {error && (
+        <div style={{ padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', fontSize: 13, color: '#dc2626' }}>
+          {error}
+        </div>
+      )}
+
       {/* Stat cards */}
       <div className={s.statsRow}>
-        {STATS.map(stat => (
+        {STAT_ICONS.map((stat, i) => (
           <div key={stat.label} className={s.statCard}>
             <div className={s.statTop}>
               <span className={s.statLabel}>{stat.label}</span>
-              <div
-                className={s.statIcon}
-                style={{ background: stat.iconColor, color: stat.iconStroke }}
-              >
+              <div className={s.statIcon} style={{ background: stat.iconColor, color: stat.iconStroke }}>
                 {stat.icon}
               </div>
             </div>
-            <div className={s.statValue}>{stat.value}</div>
-            <div className={`${s.statDelta} ${stat.up ? s.deltaUp : s.deltaDown}`}>
-              {stat.up ? <ArrowUp /> : <ArrowDown />}
-              {stat.delta}
+            {loading ? (
+              <Skeleton w={60} h={30} r={6} />
+            ) : (
+              <div className={s.statValue}>{statValues[i]}</div>
+            )}
+            <div className={`${s.statDelta} ${s.deltaUp}`}>
+              <ArrowUp />
+              {loading ? <Skeleton w={120} h={12} /> : <span>vs. mês anterior</span>}
             </div>
           </div>
         ))}
@@ -286,31 +250,52 @@ export function InicioPage() {
             </a>
           </div>
           <ul className={s.activityList}>
-            {ACTIVITY.map(item => (
-              <li key={item.id} className={s.activityItem} onClick={() => {}}>
-                <div className={s.docIcon}>
-                  <DocIcon />
-                </div>
-                <div className={s.activityMain}>
-                  <div className={s.activityMeta}>
-                    <span className={s.docNumber}>{item.numero}</span>
-                    <span className={s.unitBadge}>{item.sigla1}</span>
-                    <span className={s.unitBadge}>{item.unidade1}</span>
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <div className={s.activityTitle}>{item.titulo}</div>
-                  <div className={s.activityFlow}>
-                    <span>{item.de}</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                      <polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                    <span className={s.flowUnit}>{item.para}</span>
-                  </div>
-                </div>
-                <span className={s.activityTime}>{item.tempo}</span>
-              </li>
-            ))}
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <li key={i} className={s.activityItem} style={{ gap: 12, pointerEvents: 'none' }}>
+                    <Skeleton w={34} h={34} r={8} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <Skeleton w="60%" h={12} />
+                      <Skeleton w="85%" h={13} />
+                      <Skeleton w="40%" h={11} />
+                    </div>
+                  </li>
+                ))
+              : data?.atividades.length === 0
+              ? (
+                  <li style={{ padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+                    Nenhuma atividade recente
+                  </li>
+                )
+              : data?.atividades.map((item: DashboardAtividade) => (
+                  <li
+                    key={`${item.tramitacaoCodigo}-${item.documentoCodigo}`}
+                    className={s.activityItem}
+                    onClick={() => navigate(`/documentos/${item.documentoCodigo}`)}
+                  >
+                    <div className={s.docIcon}><DocIcon /></div>
+                    <div className={s.activityMain}>
+                      <div className={s.activityMeta}>
+                        <span className={s.docNumber}>{item.numeroNetdoc ?? item.numero ?? `#${item.documentoCodigo}`}</span>
+                        {item.tipoDocumentoSigla && <span className={s.unitBadge}>{item.tipoDocumentoSigla}</span>}
+                        <StatusBadge status={itemStatus(item)} />
+                      </div>
+                      <div className={s.activityTitle}>
+                        {item.resumo ?? item.tipoDocumentoNome ?? 'Documento'}
+                      </div>
+                      <div className={s.activityFlow}>
+                        <span>{item.origemSigla ?? '—'}</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="5" y1="12" x2="19" y2="12"/>
+                          <polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                        <span className={s.flowUnit}>{item.destinoSigla ?? '—'}</span>
+                      </div>
+                    </div>
+                    <span className={s.activityTime}>{relativeTime(item.dataEnvio)}</span>
+                  </li>
+                ))
+            }
           </ul>
         </div>
 
@@ -327,20 +312,43 @@ export function InicioPage() {
             </button>
           </div>
           <ul className={s.signList}>
-            {SIGN_ITEMS.map(item => (
-              <li key={item.id} className={s.signItem}>
-                <input type="checkbox" className={s.signCheck} defaultChecked />
-                <div className={s.signBody}>
-                  <div className={s.signDocRef}>
-                    <DocIcon />
-                    <span className={s.signDocNum}>{item.ref}</span>
-                    <span className={`${s.badge} ${s.badgePending}`}>Pendente</span>
-                  </div>
-                  <p className={s.signDesc}>{item.desc}</p>
-                  <p className={s.signRequester}>Solicitado por: {item.solicitante}</p>
-                </div>
-              </li>
-            ))}
+            {loading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <li key={i} className={s.signItem} style={{ pointerEvents: 'none' }}>
+                    <Skeleton w={16} h={16} r={3} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <Skeleton w="70%" h={12} />
+                      <Skeleton w="90%" h={12} />
+                      <Skeleton w="50%" h={11} />
+                    </div>
+                  </li>
+                ))
+              : data?.pendentesAssinatura.length === 0
+              ? (
+                  <li style={{ padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-3)' }}>
+                    Nenhuma assinatura pendente
+                  </li>
+                )
+              : data?.pendentesAssinatura.map((item: DashboardPendenteAssinatura) => (
+                  <li key={item.codigo} className={s.signItem}>
+                    <input type="checkbox" className={s.signCheck} defaultChecked />
+                    <div className={s.signBody}>
+                      <div className={s.signDocRef}>
+                        <DocIcon />
+                        <span className={s.signDocNum}>
+                          {item.numeroNetdoc ?? `Doc #${item.documentoCodigo}`}
+                        </span>
+                        <span className={`${s.badge} ${s.badgePending}`}>Pendente</span>
+                      </div>
+                      <p className={s.signDesc}>{item.resumo ?? item.tipoDocumentoNome ?? 'Documento'}</p>
+                      <p className={s.signRequester}>
+                        {item.modalidade === 'MANUSCRITA' ? 'Assinatura manuscrita' : 'Assinatura eletrônica'}
+                        {item.dataAssinatura && ` — ${new Date(item.dataAssinatura).toLocaleDateString('pt-BR')}`}
+                      </p>
+                    </div>
+                  </li>
+                ))
+            }
           </ul>
         </div>
       </div>
@@ -355,20 +363,29 @@ export function InicioPage() {
             <button className={s.chartFilter}>Últimos 30 dias</button>
           </div>
           <div className={s.chartBody}>
-            <div className={s.barChart}>
-              {BAR_DATA.map(row => (
-                <div key={row.label} className={s.barRow}>
-                  <span className={s.barLabel}>{row.label}</span>
-                  <div className={s.barTrack}>
-                    <div
-                      className={s.barFill}
-                      style={{ width: `${row.pct}%`, background: row.color }}
-                    />
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} h={8} />)}
+              </div>
+            ) : (
+              <div className={s.barChart}>
+                {(data?.tramitacoesPorSituacao ?? []).map(row => (
+                  <div key={row.label} className={s.barRow}>
+                    <span className={s.barLabel}>{row.label}</span>
+                    <div className={s.barTrack}>
+                      <div
+                        className={s.barFill}
+                        style={{
+                          width: `${Math.round((row.value / maxSit) * 100)}%`,
+                          background: row.color,
+                        }}
+                      />
+                    </div>
+                    <span className={s.barValue}>{row.value}</span>
                   </div>
-                  <span className={s.barValue}>{row.value}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -379,18 +396,29 @@ export function InicioPage() {
             <button className={s.chartFilter}>Esta semana</button>
           </div>
           <div className={s.chartBody}>
-            <div className={s.volChart}>
-              {VOL_DATA.map(d => (
-                <div key={d.day} className={s.volBar}>
-                  <span className={s.volCount}>{d.count}</span>
-                  <div
-                    className={s.volFill}
-                    style={{ height: `${(d.count / maxVol) * 80}px` }}
-                  />
-                  <span className={s.volDay}>{d.day}</span>
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 120 }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                    <Skeleton w="100%" h={40 + i * 10} r={4} />
+                    <Skeleton w={24} h={11} r={3} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={s.volChart}>
+                {(data?.volumeDiario ?? []).map(d => (
+                  <div key={d.date} className={s.volBar}>
+                    <span className={s.volCount}>{d.count}</span>
+                    <div
+                      className={s.volFill}
+                      style={{ height: `${Math.max((d.count / maxVol) * 80, 4)}px` }}
+                    />
+                    <span className={s.volDay}>{d.day}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

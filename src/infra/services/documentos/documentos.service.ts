@@ -7,6 +7,7 @@ import {
   ComentarioDocumento,
   CreateDocumentoPayload,
   CreateDocumentoResponse,
+  DashboardData,
   DespachoPadrao,
   DocumentoDetalhe,
   PecaDocumento,
@@ -21,6 +22,13 @@ import {
 
 export class DocumentosService {
   constructor(private readonly httpClient: HttpClient) {}
+
+  async getDashboard(): Promise<DashboardData> {
+    const res = await this.httpClient.get<DashboardData>('/v1/documentos/dashboard', {
+      withCredentials: true,
+    });
+    return res.data;
+  }
 
   async findCaixa(params: {
     tab?: CaixaTab;
